@@ -58,6 +58,19 @@ const schema = defineSchema(
     })
       .index("by_project", ["projectId"])
       .index("by_user", ["userId"]),
+
+    // User-uploaded custom wardrobe items
+    wardrobe_items: defineTable({
+      userId: v.id("users"),
+      name: v.string(),
+      category: v.union(
+        v.literal("top"),
+        v.literal("bottom"),
+        v.literal("full"),
+      ),
+      imageStorageId: v.id("_storage"),
+      createdAt: v.number(),
+    }).index("by_user", ["userId"]),
   },
   {
     schemaValidation: false,
