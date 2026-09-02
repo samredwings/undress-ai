@@ -1,54 +1,270 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAuth } from "@/hooks/use-auth";
-import { LayoutDashboard, LogOut } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { motion, AnimatePresence } from "framer-motion";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Upload,
+  LogOut,
+  Trash2,
+  Image as ImageIcon,
+  Wand2,
+  ArrowRight,
+} from "lucide-react";
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const projects = useQuery(api.projects.list);
+  const createProject = useMutation(api.projects.create);
+  const deleteProject = useMutation(api.projects.remove);
+
+  const [isUploading, setIsUploading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
   };
 
-  return (
-    <main className="min-h-screen bg-background px-6 py-10 text-foreground">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">
-              Authenticated workspace
-            </p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight">
-              Welcome{user?.name ? `, ${user.name}` : ""}
-            </h1>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="cursor-pointer gap-2 self-start"
-            onClick={handleSignOut}
-          >
-            <LogOut className="size-4" />
-            Sign out
-          </Button>
-        </header>
+  const handleFile = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith("image/")) return;
+      setIsUploading(true);
+      try {
+        const dataUrl = await fileToDataUrl(file);
+        const title = file.name.replace(/\.[^.]+$/, "") || "Untitled";
+        const projectId = await createProject({
+          title,
+          originalImageUrl: dataUrl,
+        });
+        navigate(`/editor/${projectId}`);
+      } catch (err) {
+        console.error("Upload failed:", err);
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [createProject, navigate],
+  );
 
-        <Card className="border-border/70 shadow-none">
-          <CardHeader>
-            <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <LayoutDashboard className="size-5" />
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragActive(false);
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    },
+    [handleFile],
+  );
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(false);
+  }, []);
+
+  const handleDelete = useCallback(
+    async (e: React.MouseEvent, projectId: string) => {
+      e.stopPropagation();
+      if (confirm("Delete this project?")) {
+        await deleteProject({ projectId: projectId as any });
+      }
+    },
+    [deleteProject],
+  );
+
+  const formatDate = (timestamp: number) => {
+    const d = new Date(timestamp);
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  return (
+    <main className="min-h-screen bg-background text-foreground">
+      {/* Header */}
+      <nav className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex size-8 cursor-pointer items-center justify-center rounded-lg bg-foreground"
+              onClick={() => navigate("/")}
+            >
+              <Wand2 className="size-4 text-background" />
             </div>
-            <CardTitle>Your dashboard is ready</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm leading-6 text-muted-foreground">
-            Replace this starter content with the product&apos;s authenticated
-            experience. The route is protected and sign-in returns here by
-            default.
-          </CardContent>
-        </Card>
+            <span className="text-lg font-semibold tracking-tight">
+              Outfit Studio
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">
+              {user?.name || user?.email || "Guest"}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="cursor-pointer gap-2 text-muted-foreground"
+              onClick={handleSignOut}
+            >
+              <LogOut className="size-3.5" />
+              Sign out
+            </Button>
+          </div>
+        </div>
+      </nav>
+
+      <div className="mx-auto max-w-6xl px-6 py-10">
+        {/* Page Header */}
+        <div className="mb-10">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Your Projects
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Upload a photo to start changing outfits.
+          </p>
+        </div>
+
+        {/* Upload Zone */}
+        <div
+          className={`mb-12 cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center transition-all ${
+            dragActive
+              ? "border-foreground bg-muted/50"
+              : "border-border/60 hover:border-border hover:bg-muted/20"
+          }`}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file);
+              e.target.value = "";
+            }}
+          />
+          <div className="flex flex-col items-center gap-4">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-muted">
+              {isUploading ? (
+                <div className="size-5 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+              ) : (
+                <Upload className="size-6 text-muted-foreground" />
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-medium">
+                {isUploading
+                  ? "Uploading..."
+                  : "Drop a photo here or click to upload"}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                PNG, JPG, or WebP — any size
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Projects Grid */}
+        {projects === undefined ? (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-64 animate-pulse rounded-xl bg-muted/50"
+              />
+            ))}
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-border/40 py-20 text-center">
+            <ImageIcon className="mb-4 size-10 text-border" />
+            <p className="text-sm font-medium text-muted-foreground">
+              No projects yet
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/70">
+              Upload a photo above to create your first project
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <AnimatePresence mode="popLayout">
+              {projects.map((project) => (
+                <motion.div
+                  key={project._id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Card
+                    className="group cursor-pointer overflow-hidden border-border/50 bg-card transition-all hover:border-border hover:shadow-md"
+                    onClick={() => navigate(`/editor/${project._id}`)}
+                  >
+                    <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+                      <img
+                        src={project.originalImageUrl}
+                        alt={project.title}
+                        className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-3 top-3 size-8 cursor-pointer bg-background/80 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 hover:bg-background"
+                        onClick={(e) => handleDelete(e, project._id)}
+                      >
+                        <Trash2 className="size-3.5 text-destructive" />
+                      </Button>
+                      <div className="absolute bottom-3 right-3 opacity-0 transition-opacity group-hover:opacity-100">
+                        <div className="flex size-8 items-center justify-center rounded-full bg-foreground">
+                          <ArrowRight className="size-3.5 text-background" />
+                        </div>
+                      </div>
+                    </div>
+                    <CardContent className="p-4">
+                      <h3 className="truncate text-sm font-medium">
+                        {project.title}
+                      </h3>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatDate(project.createdAt)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
       </div>
     </main>
   );

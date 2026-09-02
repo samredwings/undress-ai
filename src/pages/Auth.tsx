@@ -15,8 +15,7 @@ import {
 } from "@/components/ui/input-otp";
 
 import { useAuth } from "@/hooks/use-auth";
-import logo from "@/assets/logo.svg";
-import { ArrowRight, Loader2, Mail, UserX } from "lucide-react";
+import { ArrowRight, Loader2, Mail, UserX, Wand2 } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -104,7 +103,7 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
     } catch (error) {
       console.error("Guest login error:", error);
       console.error("Error details:", JSON.stringify(error, null, 2));
-      setError(`Failed to sign in as guest: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setError(`Failed to sign in as guest: ${error instanceof Error ? error.message : "Unknown error"}`);
       setIsLoading(false);
     }
   };
@@ -112,7 +111,6 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
   return (
     <div className="min-h-screen flex flex-col">
 
-      
       {/* Auth Content */}
       <div className="flex-1 flex items-center justify-center">
         <div className="flex items-center justify-center h-full flex-col">
@@ -121,16 +119,11 @@ function Auth({ redirectAfterAuth }: AuthProps = {}) {
             <>
               <CardHeader className="text-center">
               <div className="flex justify-center">
-                    <img
-                      src={logo}
-                      alt="Lock Icon"
-                      width={64}
-                      height={64}
-                      className="rounded-lg mb-4 mt-4 cursor-pointer"
-                      onClick={() => navigate("/")}
-                    />
+                    <div className="flex size-12 items-center justify-center rounded-xl bg-foreground mb-4 mt-4 cursor-pointer" onClick={() => navigate("/")}>
+                      <Wand2 className="size-6 text-background" />
+                    </div>
                   </div>
-                <CardTitle className="text-xl">Get Started</CardTitle>
+                <CardTitle className="text-xl">Welcome to Outfit Studio</CardTitle>
                 <CardDescription>
                   Enter your email to log in or sign up
                 </CardDescription>

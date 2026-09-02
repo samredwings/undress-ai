@@ -32,12 +32,33 @@ const schema = defineSchema(
       role: v.optional(roleValidator), // role of the user. do not remove
     }).index("email", ["email"]), // index for the email. do not remove or modify
 
-    // add other tables here
+    // Outfit change projects
+    projects: defineTable({
+      userId: v.id("users"),
+      title: v.string(),
+      originalImageUrl: v.string(),
+      thumbnailUrl: v.optional(v.string()),
+      createdAt: v.number(),
+    }).index("by_user", ["userId"]),
 
-    // tableName: defineTable({
-    //   ...
-    //   // table fields
-    // }).index("by_field", ["field"])
+    // AI generations per project
+    generations: defineTable({
+      projectId: v.id("projects"),
+      userId: v.id("users"),
+      prompt: v.string(),
+      garmentImageUrl: v.optional(v.string()),
+      resultImageUrl: v.optional(v.string()),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("processing"),
+        v.literal("completed"),
+        v.literal("failed"),
+      ),
+      error: v.optional(v.string()),
+      createdAt: v.number(),
+    })
+      .index("by_project", ["projectId"])
+      .index("by_user", ["userId"]),
   },
   {
     schemaValidation: false,
