@@ -280,8 +280,8 @@ export default function Landing() {
             Ready to try it?
           </h2>
           <p className="mt-4 text-muted-foreground">
-            Upload a photo and see what's possible. No account required to
-            start.
+            Upload a photo and see what's possible. Sign in takes less than a
+            minute.
           </p>
           <Button
             size="lg"
