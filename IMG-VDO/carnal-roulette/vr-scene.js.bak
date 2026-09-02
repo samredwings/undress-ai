@@ -1,0 +1,39 @@
+/**
+ * CARNAL ROULETTE VR — VR Scene Manager
+ * Handles Three.js scene, WebXR, stereo rendering, first-person camera
+ */
+
+const VRScene = {
+  renderer: null,
+  scene: null,
+  camera: null,
+  clock: null,
+  xrManager: null,
+  isVR: false,
+
+  characters: [],
+  environment: null,
+  lighting: null,
+  
+  animationId: null,
+  isRunning: false,
+
+  async init(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) throw new Error('VR container not found');
+
+    // === RENDERER ===
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: 'high-performance',
+    });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.2;
+    this.renderer.xr.enabled = true;
+
+   

@@ -1,0 +1,19 @@
+USER UPLOADS PHOTOS
+       ↓
+AssetPipeline detects faces via MediaPipe/TensorFlow.js
+       ↓
+Face landmarks extracted → CharacterSystem builds 3D mesh config
+       ↓
+Body templates morphed to match proportions from images
+       ↓
+VRScene renders environment + characters in Three.js
+       ↓
+WebXR enables VR mode (headset or fallback)
+       ↓
+GameLogic runs roulette engine: acts, climax tracking
+       ↓
+Interaction handles controller / button input
+       ↓
+Audio generates procedural sound
+       ↓
+Recorder captures everything to WebM video

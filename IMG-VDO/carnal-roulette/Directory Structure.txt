@@ -1,0 +1,30 @@
+carnal-roulette-plugin/
+├── index.html              — Plugin entry point (iframe-ready)
+├── plugin-api.js           — Parent app communication protocol
+├── engine/
+│   ├── core.js             — ECS core: Entity, Component, System
+│   ├── event-bus.js        — Event bus for decoupled communication
+│   ├── scene-manager.js    — Three.js scene lifecycle
+│   └── asset-loader.js     — Secure asset transfer from parent app
+├── systems/
+│   ├── rendering.js        — WebGL/XR rendering system
+│   ├── animation.js        — Character animation & morph targets
+│   ├── physics.js          — Cannon.js physics
+│   ├── interaction.js      — VR controller / input handling
+│   ├── audio-system.js     — Procedural audio
+│   ├── climax.js           — Climax detection & reaction
+│   └── recorder.js         — Session recording
+├── components/
+│   ├── character.js        — Character data component
+│   ├── transform.js        — Position/rotation/scale
+│   ├── mesh.js             — Three.js mesh reference
+│   ├── body-props.js       — Body proportion data
+│   ├── arousal.js          — Arousal/climax state
+│   └── animation-state.js  — Current animation blend weights
+├── ui/
+│   ├── pipeline.html       — Asset pipeline UI fragment
+│   ├── hud.html            — VR HUD fragment
+│   └── styles.css          — All styles
+├── tests/
+│   └── pentest-scenarios.md — Penetration testing guide
+└── manifest.json           — Plugin manifest for parent app

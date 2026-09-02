@@ -1,0 +1,32 @@
+-- CreateEnum
+CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'CREATOR', 'USER');
+
+-- CreateEnum
+CREATE TYPE "UserStatus" AS ENUM ('ACTIVE', 'SUSPENDED', 'DELETED');
+
+-- CreateEnum
+CREATE TYPE "StoryboardStatus" AS ENUM ('DRAFT', 'IN_PROGRESS', 'COMPLETED', 'PUBLISHED', 'ARCHIVED');
+
+-- CreateEnum
+CREATE TYPE "StoryGenre" AS ENUM ('ROMANCE', 'FANTASY', 'SCI_FI', 'DRAMA', 'MYSTERY', 'ADVENTURE', 'EROTICA', 'THRILLER', 'HORROR', 'COMEDY', 'OTHER');
+
+-- CreateEnum
+CREATE TYPE "ContentRating" AS ENUM ('G', 'PG', 'PG_13', 'R', 'NC_17', 'X', 'XXX');
+
+-- CreateEnum
+CREATE TYPE "StoryStatus" AS ENUM ('DRAFT', 'IN_PROGRESS', 'COMPLETED', 'PUBLISHED', 'ARCHIVED');
+
+-- CreateEnum
+CREATE TYPE "SceneStatus" AS ENUM ('PENDING', 'PROCESSING', 'GENERATING_VIDEO', 'COMPLETED', 'FAILED');
+
+-- CreateEnum
+CREATE TYPE "JobStatus" AS ENUM ('QUEUED', 'PROCESSING', 'GENERATING', 'COMPLETED', 'FAILED', 'CANCELLED');
+
+-- CreateEnum
+CREATE TYPE "VideoProvider" AS ENUM ('RUNWAY', 'PIKA', 'COGVIDEOX');
+
+-- CreateEnum
+CREATE TYPE "ContentCheckType" AS ENUM ('STORY', 'SCENE', 'VIDEO', 'IMAGE');
+
+-- CreateEnum
+CREATE TYPE "NSFWAction" AS ENUM ('ALLOW', 'FLAG', 'BLOCK', 'BLUR');

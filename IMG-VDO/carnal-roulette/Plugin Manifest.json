@@ -1,0 +1,71 @@
+{
+  "id": "carnal-roulette-vr",
+  "name": "Carnal Roulette VR",
+  "version": "2.0.0",
+  "description": "Immersive VR adult scene module for the roleplay app. Generates interactive 3D scenes from storyline characters.",
+  "type": "experience-plugin",
+  "api": {
+    "version": "1.0",
+    "protocol": "postMessage",
+    "events": {
+      "receives": [
+        "carnal:characters:assign",
+        "carnal:asset:provide",
+        "carnal:storyline:context",
+        "carnal:characters:modify",
+        "carnal:state:request",
+        "carnal:permission:grant",
+        "carnal:config:override",
+        "carnal:terminate"
+      ],
+      "sends": [
+        "carnal:ready",
+        "carnal:asset:request",
+        "carnal:state:update",
+        "carnal:recording:complete",
+        "carnal:interaction:event",
+        "carnal:error"
+      ]
+    }
+  },
+  "capabilities": [
+    "webxr-vr",
+    "asset-pipeline",
+    "session-recording",
+    "procedural-audio",
+    "character-customization",
+    "procedural-body-generation"
+  ],
+  "sandbox": {
+    "iframe": true,
+    "required-permissions": [
+      "load-character-assets",
+      "access-webxr",
+      "record-session",
+      "access-microphone"
+    ]
+  },
+  "requirements": {
+    "browser": "Chrome 90+ / Firefox 90+ / Edge 90+",
+    "webxr": "WebXR Device API required for VR",
+    "threejs": "r128+",
+    "assets": {
+      "min-face-image": "512x512px",
+      "recommended-model": "GLB format, <50MB",
+      "face-landmarks": "468-point MediaPipe compatible"
+    }
+  },
+  "performance": {
+    "target-fps": "72fps (VR), 60fps (desktop)",
+    "max-polygons": "15000 per character",
+    "max-texture-size": "2048x2048",
+    "recommended-gpu": "Adreno 650 / Apple A13 / GTX 1060+"
+  },
+  "security": {
+    "origin-validation": true,
+    "sandboxed-iframe": true,
+    "asset-source-validation": true,
+    "no-eval": true,
+    "content-security-policy": "script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net"
+  }
+}

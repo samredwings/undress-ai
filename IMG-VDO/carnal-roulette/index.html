@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>CARNAL ROULETTE VR • ASSET PIPELINE</title>
+<!-- Three.js core -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- WebXR polyfill for fallback -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/WebXRManager.js"></script>
+<!-- GLTF exporter for saving user assets -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+<!-- TensorFlow.js + MediaPipe for face mesh reconstruction -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@3.18.0/dist/tf-core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@3.18.0/dist/tf-converter.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@3.18.0/dist/tf-backend-webgl.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@1.0.0/dist/face-landmarks-detection.min.js"></script>
+<!-- Cannon-es for physics -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cannon-es/0.20.0/cannon-es.js"></script>
+<!-- Main app styles -->
+<link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<!-- VR Overlay -->
+<div id="vr-overlay" class="vr-overlay hidden">
+  <div class="vr-hud">
+    <div class="hud-left">
+      <span id="hud-round">ROUND 1</span>
+      <span id="hud-intensity">INTENSITY: 45%</span>
+    </div>
+    <div class="hud-center">
+      <span id="hud-act">DEEP THROAT</span>
+    </div>
+    <div class="hud-right">
+      <span id="hud-timer">--:--</span>
+      <button id="btn-exit-vr" class="hud-btn">EXIT VR</button>
+    </div>
+  </div>
+  
+  <div id="vr-container"></div>
+  
+  <div class="vr-controls-panel">
+    <div class="partner-status" id="partner-status"></div>
+    <div class="action-wheel">
+      <button class="vr-action" data-action="thrust">THRUST</button>
+      <button class="vr-action" data-action="tease">TEASE</button>
+      <button class="vr-action" data-action="deep">DEEP</button>
+      <button class="vr-action" data-action="rhythm">RHYTHM</button>
+    </div>
+    <div class="climax-meter-container">
+      <div class="climax-label">CLIMAX METER</div>
+      <div class="climax-track">
+        <div class="climax-fill" id="climax-fill" style="width: 0%"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Asset Pipeline Screen (Pre-VR) -->
+<div id="asset-pipeline" class="pipeline-screen">
+  <div class="pipeline-header">
+    <h1>CARNAL ROULETTE <span class="vr-badge">VR</span></h1>
+    <p class="subtitle">ASSET PIPELINE • UPLOAD IMAGES TO GENERATE YOUR SCENE</p>
+  </div>
+
+  <div class="pipeline-body">
+    <!-- Left: Asset upload grid -->
+    <div class="asset-upload-panel">
+      <h2>CHARACTER ASSETS</h2>
+      <p class="hint">Upload photos to generate 3D models. Face, body, or full figure.</p>
+      
+      <div class="upload-grid" id="upload-grid">
+        <!-- Slot 1: Player character (You) -->
+        <div class="asset-slot primary" data-slot="player">
+          <div class="slot-label">YOU (POV Body)</div>
+          <div class="slot-preview" id="preview-player">
+            <div class="slot-placeholder">
+              <span class="icon">📷</span>
+              <span>Upload your photo</span>
+            </div>
+          </div>
+          <input type="file" class="asset-file-input" data-target="player" accept="image/*" hidden>
+          <button class="btn-upload" data-target="player">SELECT IMAGE</button>
+          <div class="slot-status" id="status-player">Not loaded</div>
+        </div>
+
+        <!-- Slot 2: Partner 1 -->
+        <div class="asset-slot" data-slot="partner1">
+          <div class="slot-label">PARTNER 1</div>
+          <div class="slot-preview" id="preview-partner1">
+            <div class="slot-placeholder">
+              <span class="icon">📷</span>
+              <span>Upload photo</span>
+            </div>
+          </div>
+          <input type="file" class="asset-file-input" data-target="partner1" accept="image/*" hidden>
+          <button class="btn-upload" data-target="partner1">SELECT IMAGE</button>
+          <div class="slot-status" id="status-partner1">Not loaded</div>
+        </div>
+
+        <!-- Slot 3: Partner 2 -->
+        <div class="asset-slot" data-slot="partner2">
+          <div class="slot-label">PARTNER 2</div>
+          <div class="slot-preview" id="preview-partner2">
+            <div class="slot-placeholder">
+              <span class="icon">📷</span>
+              <span>Upload photo</span>
+            </div>
+          </div>
+          <input type="file" class="asset-file-input" data-target="partner2" accept="image/*" hidden>
+          <button class="btn-upload" data-target="partner2">SELECT IMAGE</button>
+          <div class="slot-status" id="status-partner2">Not loaded</div>
+        </div>
+
+        <!-- Slot 4: Environment / Scene reference -->
+        <div class="asset-slot" data-slot="environment">
+          <div class="slot-label">ENVIRONMENT REF</div>
+          <div class="slot-preview" id="preview-environment">
+            <div class="slot-placeholder">
+              <span class="icon">🌌</span>
+              <span>Scene mood reference</span>
+            </div>
+          </div>
+          <input type="file" class="asset-file-input" data-target="environment" accept="image/*" hidden>
+          <button class="btn-upload" data-target="environment">SELECT IMAGE</button>
+          <div class="slot-status" id="status-environment">Optional</div>
+        </div>
+      </div>
+
+      <!-- Body part customization -->
+      <div class="body-part-panel">
+        <h3>BODY PART MAPPING</h3>
+        <div class="body-part-grid">
+          <div class="bp-item">
+            <label>Face</label>
+            <input type="file" accept="image/*" data-part="face" class="bp-input">
+            <span class="bp-status">Auto-detected</span>
+          </div>
+          <div class="bp-item">
+            <label>Torso</label>
+            <input type="file" accept="image/*" data-part="torso" class="bp-input">
+            <span class="bp-status">Auto-mapped</span>
+          </div>
+          <div class="bp-item">
+            <label>Genitalia</label>
+            <input type="file" accept="image/*" data-part="genital" class="bp-input">
+            <span class="bp-status">Optional</span>
+          </div>
+          <div class="bp-item">
+            <label>Hands</label>
+            <input type="file" accept="image/*" data-part="hands" class="bp-input">
+            <span class="bp-status">Auto-generated</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pipeline-actions">
+        <button id="btn-generate-assets" class="btn-primary" disabled>
+          ⚡ GENERATE 3D SCENE
+        </button>
+        <div class="progress-bar" id="gen-progress" style="display:none;">
+          <div class="progress-fill" id="gen-progress-fill" style="width:0%"></div>
+        </div>
+        <span id="gen-status" class="gen-status"></span>
+      </div>
+    </div>
+
+    <!-- Right: Preview & Config -->
+    <div class="config-panel">
+      <h2>SCENE CONFIGURATION</h2>
+      
+      <div class="config-section">
+        <label>SCENE TYPE</label>
+        <select id="scene-type">
+          <option value="bedroom">Bedroom • Soft lighting</option>
+          <option value="dungeon">Dungeon • Dark & rough</option>
+          <option value="mirror">Mirror room • Self-view</option>
+          <option value="outdoor">Outdoor • Exhibition</option>
+          <option value="pool">Pool / Water play</option>
+        </select>
+      </div>
+
+      <div class="config-section">
+        <label>INTENSITY MODE</label>
+        <div class="config-slider">
+          <input type="range" id="intensity-slider" min="1" max="10" value="5">
+          <span id="intensity-label">5 — Balanced</span>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <label>PARTNER COUNT</label>
+        <div class="partner-count-selector">
+          <button class="count-btn active" data-count="1">1</button>
+          <button class="count-btn" data-count="2">2</button>
+          <button class="count-btn" data-count="3">3</button>
+          <button class="count-btn" data-count="4">4</button>
+        </div>
+      </div>
+
+      <div class="config-section">
+        <label>ROUND DURATION (MIN)</label>
+        <select id="round-duration">
+          <option value="3">3 min — Quick</option>
+          <option value="5" selected>5 min — Standard</option>
+          <option value="8">8 min — Extended</option>
+          <option value="15">15 min — Marathon</option>
+        </select>
+      </div>
+
+      <div class="config-section">
+        <label>KINK ENABLES</label>
+        <div class="kink-toggles">
+          <label class="kink-toggle"><input type="checkbox" checked> Bondage</label>
+          <label class="kink-toggle"><input type="checkbox" checked> Facials</label>
+          <label class="kink-toggle"><input type="checkbox" checked> Anal</label>
+          <label class="kink-toggle"><input type="checkbox"> Watersports</label>
+          <label class="kink-toggle"><input type="checkbox"> Cum play</label>
+          <label class="kink-toggle"><input type="checkbox"> Breath play</label>
+          <label class="kink-toggle"><input type="checkbox"> Pet play</label>
+          <label class="kink-toggle"><input type="checkbox"> BDSM</label>
+        </div>
+      </div>
+
+      <!-- Scene preview (2D mockup) -->
+      <div class="scene-preview-box" id="scene-preview">
+        <div class="preview-placeholder">
+          <span class="icon-3d">🧊</span>
+          <p>3D preview will appear here after asset generation</p>
+        </div>
+      </div>
+
+      <!-- Enter VR button (appears after generation) -->
+      <button id="btn-enter-vr" class="btn-vr" style="display:none;">
+        🥽 ENTER VR EXPERIENCE
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Recording controls (hidden until VR mode) -->
+<div id="recording-bar" class="recording-bar hidden">
+  <button id="btn-start-record" class="rec-btn">⏺ RECORD SESSION</button>
+  <button id="btn-stop-record" class="rec-btn" disabled>⏹ STOP</button>
+  <span id="rec-timer" class="rec-timer">00:00</span>
+  <span id="rec-status" class="rec-status">Idle</span>
+</div>
+
+<!-- Scripts -->
+<script src="js/game-logic.js"></script>
+<script src="js/asset-pipeline.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/character-system.js"></script>
+<script src="js/interaction.js"></script>
+<script src="js/recorder.js"></script>
+<script src="js/ui-controller.js"></script>
+<script src="js/vr-scene.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

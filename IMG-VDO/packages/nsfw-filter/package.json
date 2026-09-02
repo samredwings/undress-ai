@@ -1,0 +1,17 @@
+{
+  "name": "@storybook/nsfw-filter",
+  "version": "1.0.0",
+  "description": "NSFW content detection — unrestricted mode (always permissive)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@storybook/shared": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

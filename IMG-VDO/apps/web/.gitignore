@@ -1,0 +1,3 @@
+# Build-time env (API base URL for the static export / APK) — machine-specific
+.env.production
+

@@ -1,0 +1,38 @@
+{
+  "moduleId": "carnal-roulette-vr",
+  "version": "3.0.0",
+  "type": "adult-scene-engine",
+  "entry": "index.html",
+  "api": {
+    "version": "2.1",
+    "namespace": "carnalRoulette"
+  },
+  "capabilities": [
+    "vr-rendering",
+    "story-to-asset-generation",
+    "character-import",
+    "state-synchronization",
+    "session-recording",
+    "multi-partner-scenes"
+  ],
+  "dependencies": {
+    "threejs": ">=0.160.0",
+    "tensorflowjs": ">=4.0.0",
+    "parent-app": {
+      "minimumApiVersion": "2.0",
+      "requiredEndpoints": [
+        "character.getProfile",
+        "character.getRelationshipState",
+        "narrative.getCurrentContext",
+        "scene.trigger",
+        "assets.getCharacterMedia"
+      ]
+    }
+  },
+  "lifecycle": {
+    "onMount": "carnalRoulette.module.mount",
+    "onUnmount": "carnalRoulette.module.unmount",
+    "onStateChange": "carnalRoulette.module.syncState",
+    "onNarrativeEvent": "carnalRoulette.module.handleNarrativeEvent"
+  }
+}

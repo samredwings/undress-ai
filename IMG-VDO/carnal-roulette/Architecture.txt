@@ -1,0 +1,23 @@
+PARENT ROLEPLAY APP
+        │
+        ├─ Narrative Engine (LLM-driven story generation)
+        ├─ Character Database (persistent, per-user)
+        ├─ Relationship/State Tracker
+        └─ Scene Trigger System
+               │
+               ▼
+┌────────────────────────────────────────────┐
+│        CARNAL ROULETTE MODULE              │
+│                                            │
+│  PluginInterface ── registers callbacks    │
+│       │                                    │
+│  StoryAssetPipeline ── context→3D gen      │
+│       │                                    │
+│  NarrativeStateMachine ── state transitions │
+│       │                                    │
+│  CharacterSchemaValidator ── data guard    │
+│       │                                    │
+│  VRExperience ── Three.js WebXR layer      │
+│       │                                    │
+│  Recorder/Analytics ── session export      │
+└────────────────────────────────────────────┘

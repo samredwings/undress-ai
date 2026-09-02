@@ -1,0 +1,629 @@
+/**
+ * CARNAL ROULETTE VR — Narrative Tone System
+ * 
+ * The bridge between the parent app's storyline and the physical scene.
+ * This system determines HOW an act feels based on:
+ *   - Character relationship (lovers, strangers, rivals, owner/owned, etc.)
+ *   - Narrative tone from the parent app (romantic, tense, playful, desperate)
+ *   - Intimacy & trust levels
+ *   - Consent state (enthusiastic, hesitant, coerced, negotiated)
+ *   - Scene context (first time, reunion, goodbye, punishment, celebration)
+ * 
+ * Every sexual act is filtered through this system to determine:
+ *   - Animation style (tender vs rough)
+ *   - Dialogue tone (whispered affection vs degrading commands)
+ *   - Speed & intensity curves
+ *   - Eye contact, touch patterns, kissing intensity
+ *   - Aftercare needs
+ * 
+ * No content is hardcoded. Everything flows from the narrative context.
+ */
+
+class NarrativeToneSystem {
+  constructor() {
+    this.name = 'NarrativeTone';
+    
+    /**
+     * Relationship archetypes define the baseline dynamic.
+     * These come from the parent app's character definitions.
+     * Each archetype has a range of acceptable tones.
+     */
+    this.RELATIONSHIP_ARCHETYPES = {
+      strangers: {
+        label: 'Strangers / First Meeting',
+        baseTrust: 15,
+        baseIntimacy: 5,
+        allowedTones: ['tentative', 'curious', 'hungry'],
+        defaultTone: 'tentative',
+        consentRequired: 'explicit',
+        emotionalRange: ['curiosity', 'nervousness', 'desire'],
+        dialogueStyle: 'discovering',
+        touchStyle: 'exploratory',
+        aftercareNeeded: false,
+      },
+      acquaintances: {
+        label: 'Acquaintances / Casual',
+        baseTrust: 30,
+        baseIntimacy: 20,
+        allowedTones: ['playful', 'hungry', 'teasing'],
+        defaultTone: 'playful',
+        consentRequired: 'explicit',
+        emotionalRange: ['playfulness', 'confidence', 'nervousness'],
+        dialogueStyle: 'banter',
+        touchStyle: 'confident',
+        aftercareNeeded: false,
+      },
+      lovers: {
+        label: 'Lovers / Romantic Partners',
+        baseTrust: 70,
+        baseIntimacy: 75,
+        allowedTones: ['tender', 'passionate', 'playful', 'desperate', 'rough', 'reverent'],
+        defaultTone: 'passionate',
+        consentRequired: 'implied-with-checkins',
+        emotionalRange: ['love', 'trust', 'vulnerability', 'joy', 'sadness', 'desperation', 'gratitude'],
+        dialogueStyle: 'intimate',
+        touchStyle: 'knowing',
+        aftercareNeeded: true,
+      },
+      dominantSubmissive: {
+        label: 'Dominant / Submissive (Negotiated)',
+        baseTrust: 80,
+        baseIntimacy: 60,
+        allowedTones: ['rough', 'reverent', 'teasing', 'commanding', 'tender-as-reward'],
+        defaultTone: 'commanding',
+        consentRequired: 'pre-negotiated-with-safewords',
+        emotionalRange: ['submission', 'dominance', 'pride', 'vulnerability', 'trust', 'exhilaration'],
+        dialogueStyle: 'power-exchange',
+        touchStyle: 'intentional',
+        aftercareNeeded: true,
+      },
+      ownerOwned: {
+        label: 'Owner / Owned (Deep D/s)',
+        baseTrust: 90,
+        baseIntimacy: 85,
+        allowedTones: ['commanding', 'rough', 'reverent', 'posessive', 'tender-as-reward', 'degrading-as-play'],
+        defaultTone: 'posessive',
+        consentRequired: 'pre-negotiated-continuously-reaffirmed',
+        emotionalRange: ['devotion', 'pride', 'vulnerability', 'protection', 'ecstasy', 'surrender'],
+        dialogueStyle: 'ownership',
+        touchStyle: 'claiming',
+        aftercareNeeded: true,
+      },
+      rivals: {
+        label: 'Rivals / Enemies with Tension',
+        baseTrust: 10,
+        baseIntimacy: 40,
+        allowedTones: ['rough', 'desperate', 'aggressive', 'sarcastic'],
+        defaultTone: 'rough',
+        consentRequired: 'explicit-challenging',
+        emotionalRange: ['anger', 'lust', 'contempt', 'surprise', 'grudging-respect'],
+        dialogueStyle: 'antagonistic',
+        touchStyle: 'aggressive',
+        aftercareNeeded: false,
+      },
+      forbidden: {
+        label: 'Forbidden / Taboo (Story-Driven)',
+        baseTrust: 50,
+        baseIntimacy: 50,
+        allowedTones: ['desperate', 'guilty', 'rough', 'tender', 'reverent'],
+        defaultTone: 'desperate',
+        consentRequired: 'explicit-with-guilt',
+        emotionalRange: ['guilt', 'desperation', 'ecstasy', 'fear', 'longing', 'shame'],
+        dialogueStyle: 'conflicted',
+        touchStyle: 'desperate',
+        aftercareNeeded: true,
+      },
+      mentorStudent: {
+        label: 'Mentor / Student (Power Dynamic)',
+        baseTrust: 60,
+        baseIntimacy: 30,
+        allowedTones: ['tender', 'reverent', 'commanding', 'guilty'],
+        defaultTone: 'reverent',
+        consentRequired: 'explicit-careful',
+        emotionalRange: ['trust', 'guidance', 'nervousness', 'gratitude', 'desire'],
+        dialogueStyle: 'instructional',
+        touchStyle: 'guided',
+        aftercareNeeded: true,
+      },
+    };
+
+    /**
+     * Narrative tones — these are the emotional QUALIFIERS that
+     * modify how the baseline relationship archetype expresses itself.
+     * 
+     * The parent app sends a tone with each scene transition.
+     * The same two lovers can have very different scenes depending on tone.
+     */
+    this.TONES = {
+      tender: {
+        label: 'Tender',
+        speed: 0.4,
+        roughness: 0.1,
+        dialogueIntensity: 0.3,
+        kissFrequency: 0.9,
+        eyeContact: 0.8,
+        touchGentleness: 0.9,
+        verbalAffection: 0.9,
+        degradation: 0.0,
+        painFocus: 0.0,
+        description: 'Soft touches, whispered affirmations, slow movement. Making love.',
+      },
+      passionate: {
+        label: 'Passionate',
+        speed: 0.7,
+        roughness: 0.4,
+        dialogueIntensity: 0.6,
+        kissFrequency: 0.7,
+        eyeContact: 0.7,
+        touchGentleness: 0.5,
+        verbalAffection: 0.6,
+        degradation: 0.1,
+        painFocus: 0.1,
+        description: 'Intense connection, deep kissing, urgent movement. Consuming desire.',
+      },
+      playful: {
+        label: 'Playful / Teasing',
+        speed: 0.5,
+        roughness: 0.2,
+        dialogueIntensity: 0.5,
+        kissFrequency: 0.6,
+        eyeContact: 0.6,
+        touchGentleness: 0.7,
+        verbalAffection: 0.5,
+        degradation: 0.2,
+        painFocus: 0.0,
+        description: 'Laughter between kisses, teasing touches, light dominance games.',
+      },
+      desperate: {
+        label: 'Desperate / Urgent',
+        speed: 0.9,
+        roughness: 0.6,
+        dialogueIntensity: 0.8,
+        kissFrequency: 0.5,
+        eyeContact: 0.9,
+        touchGentleness: 0.2,
+        verbalAffection: 0.4,
+        degradation: 0.3,
+        painFocus: 0.2,
+        description: 'Clawing at each other. Fear of separation. This might be the last time.',
+      },
+      rough: {
+        label: 'Rough / Primal',
+        speed: 0.85,
+        roughness: 0.8,
+        dialogueIntensity: 0.7,
+        kissFrequency: 0.3,
+        eyeContact: 0.4,
+        touchGentleness: 0.1,
+        verbalAffection: 0.2,
+        degradation: 0.5,
+        painFocus: 0.5,
+        description: 'Gripping, pulling hair, being thrown around. Raw physicality.',
+      },
+      reverent: {
+        label: 'Reverent / Worshipful',
+        speed: 0.3,
+        roughness: 0.05,
+        dialogueIntensity: 0.4,
+        kissFrequency: 0.6,
+        eyeContact: 0.9,
+        touchGentleness: 1.0,
+        verbalAffection: 0.9,
+        degradation: 0.0,
+        painFocus: 0.0,
+        description: 'Touching like sacred ground. Kissing every inch. Gratitude and awe.',
+      },
+      commanding: {
+        label: 'Commanding / Dominant',
+        speed: 0.7,
+        roughness: 0.6,
+        dialogueIntensity: 0.9,
+        kissFrequency: 0.4,
+        eyeContact: 0.8,
+        touchGentleness: 0.3,
+        verbalAffection: 0.3,
+        degradation: 0.6,
+        painFocus: 0.4,
+        description: 'Orders given and followed. Firm hands. Controlled intensity.',
+      },
+      guilty: {
+        label: 'Guilty / Conflicted',
+        speed: 0.5,
+        roughness: 0.3,
+        dialogueIntensity: 0.5,
+        kissFrequency: 0.4,
+        eyeContact: 0.3,
+        touchGentleness: 0.5,
+        verbalAffection: 0.3,
+        degradation: 0.2,
+        painFocus: 0.1,
+        description: '"We shouldnt be doing this." But you cant stop. Eyes that cant meet.',
+      },
+      aggressive: {
+        label: 'Aggressive / Hostile',
+        speed: 0.95,
+        roughness: 0.95,
+        dialogueIntensity: 0.9,
+        kissFrequency: 0.1,
+        eyeContact: 0.2,
+        touchGentleness: 0.0,
+        verbalAffection: 0.0,
+        degradation: 0.8,
+        painFocus: 0.8,
+        description: 'Not making love. Taking. Anger and lust blurred together.',
+      },
+      sarcastic: {
+        label: 'Sarcastic / Snarky',
+        speed: 0.6,
+        roughness: 0.4,
+        dialogueIntensity: 0.6,
+        kissFrequency: 0.3,
+        eyeContact: 0.5,
+        touchGentleness: 0.4,
+        verbalAffection: 0.1,
+        degradation: 0.4,
+        painFocus: 0.1,
+        description: 'Biting remarks between bites to the neck. Smirking while moaning.',
+      },
+    };
+
+    /**
+     * Emotional reactions — how a character expresses what they're feeling
+     * during a scene, based on the active tone and their personality.
+     */
+    this.EMOTIONAL_REACTIONS = {
+      love: {
+        dialogue: [
+          'I love you. Say it back.',
+          'Look at me. I want to see your eyes when I...',
+          'Youre so beautiful like this.',
+          'I cant believe youre mine.',
+          'I never want this to end.',
+        ],
+        physicalCues: ['lingering eye contact', 'gentle face touching', 'slow deep strokes'],
+        breathingPattern: 'deep and synchronized',
+      },
+      vulnerability: {
+        dialogue: [
+          'Im scared how much I need this.',
+          'Dont stop holding me.',
+          'I feel so exposed... but I trust you.',
+          'No ones ever seen me like this.',
+        ],
+        physicalCues: ['trembling', 'burying face in neck', 'holding tight'],
+        breathingPattern: 'shallow, catching',
+      },
+      desperation: {
+        dialogue: [
+          'Please... please I need you so bad.',
+          'Dont you dare stop. Dont you fucking stop.',
+          'I dont care anymore. Just... just do it.',
+          'If this is the last time, make it count.',
+        ],
+        physicalCues: ['clawing at back', 'frantic kisses', 'pulling closer'],
+        breathingPattern: 'ragged, gasping',
+      },
+      guilt: {
+        dialogue: [
+          'We shouldnt be doing this.',
+          '...we cant tell anyone.',
+          'I know this is wrong but I cant stop.',
+          'Tell me you dont regret this.',
+        ],
+        physicalCues: ['hesitant touches', 'avoiding eye contact', 'sudden clinging'],
+        breathingPattern: 'uneven, sighing',
+      },
+      dominance: {
+        dialogue: [
+          'Look at me when youre taking it.',
+          'You belong to me. Say it.',
+          'I decide when you come. Understood?',
+          'Take it. All of it. You can handle it.',
+        ],
+        physicalCues: ['firm grip on jaw', 'pushing into bed', 'controlled movements'],
+        breathingPattern: 'steady, controlled',
+      },
+      submission: {
+        dialogue: [
+          'I trust you. Do what you want with me.',
+          'Please... please let me make you feel good.',
+          'Im yours. All of me.',
+          'Tell me what you need. Let me be that for you.',
+        ],
+        physicalCues: ['exposed throat', 'open body language', 'waiting for guidance'],
+        breathingPattern: 'following partners rhythm',
+      },
+      ecstasy: {
+        dialogue: [
+          'Oh god... oh fuck... right there!',
+          'Im gonna... please dont stop...',
+          'Yes yes yes YES!',
+          '*incoherent moaning*',
+        ],
+        physicalCues: ['arched back', 'trembling thighs', 'gripping sheets'],
+        breathingPattern: 'fast, desperate',
+      },
+      tenderness: {
+        dialogue: [
+          'Youre so good to me.',
+          'I want to take care of you.',
+          'Come here. Let me hold you.',
+          'Ive got you. Im right here.',
+        ],
+        physicalCues: ['soft kisses on forehead', 'caressing hair', 'spooning'],
+        breathingPattern: 'slow, calming',
+      },
+    };
+  }
+
+  /**
+   * MAIN API: Resolve the active tone for a scene
+   * 
+   * Called when a scene starts or transitions.
+   * Takes character relationship data + narrative context
+   * and returns the resolved tone profile.
+   * 
+   * @param {Object} context - From parent app
+   * @param {Object} context.character - The receiving character
+   * @param {Object} context.relationship - Relationship state
+   * @param {string} context.narrativeTone - Suggested tone from story
+   * @param {string} context.narrativePosition - Scene position in story
+   * @param {number} context.intensity - 1-10 scene intensity
+   * @returns {Object} Resolved tone configuration
+   */
+  resolveSceneTone(context) {
+    const {
+      character,
+      relationship,
+      narrativeTone,
+      narrativePosition,
+      intensity,
+    } = context;
+
+    // 1. Get relationship archetype
+    const archetype = this.RELATIONSHIP_ARCHETYPES[relationship?.archetype] 
+      || this.RELATIONSHIP_ARCHETYPES.strangers;
+
+    // 2. Determine allowed tones
+    const allowedTones = archetype.allowedTones;
+
+    // 3. Select tone: narrative suggested, or default from archetype
+    let toneId = narrativeTone || archetype.defaultTone;
+    
+    // Validate against allowed tones
+    if (!allowedTones.includes(toneId)) {
+      // Find closest allowed tone
+      toneId = this.findClosestTone(toneId, allowedTones);
+    }
+
+    // 4. Get the tone profile
+    const toneProfile = { ...this.TONES[toneId] };
+    if (!toneProfile) {
+      console.warn(`[NarrativeTone] Unknown tone: ${toneId}, falling back`);
+      return this.resolveSceneTone({ ...context, narrativeTone: archetype.defaultTone });
+    }
+
+    // 5. Modulate by intensity (1-10 scales tone parameters)
+    const intensityFactor = (intensity || 5) / 5; // 0.2 to 2.0, centered at 1.0
+    
+    toneProfile.speed = THREE.MathUtils.clamp(toneProfile.speed * intensityFactor, 0.1, 1.0);
+    toneProfile.roughness = THREE.MathUtils.clamp(toneProfile.roughness * intensityFactor, 0, 1.0);
+    toneProfile.dialogueIntensity = THREE.MathUtils.clamp(toneProfile.dialogueIntensity * intensityFactor, 0, 1.0);
+
+    // 6. Modulate by relationship trust
+    const trust = relationship?.trust ?? archetype.baseTrust;
+    const trustModifier = trust / 100; // 0-1
+    
+    // Higher trust allows more intense tones without breaking consent
+    toneProfile.consentStability = trustModifier;
+
+    // 7. Modulate by narrative position
+    if (narrativePosition === 'climax') {
+      toneProfile.speed = Math.min(1.0, toneProfile.speed * 1.3);
+      toneProfile.roughness = Math.min(1.0, toneProfile.roughness * 1.2);
+    } else if (narrativePosition === 'resolution' || narrativePosition === 'aftercare') {
+      toneProfile.speed *= 0.5;
+      toneProfile.roughness *= 0.3;
+      toneProfile.touchGentleness = Math.max(toneProfile.touchGentleness, 0.7);
+    }
+
+    // 8. Generate emotional context for the scene
+    const emotions = this.generateEmotionalContext(archetype, toneId, relationship, intensity);
+
+    // 9. Build consent model
+    const consent = this.buildConsentModel(archetype, toneId, trust);
+
+    return {
+      toneId,
+      toneProfile,
+      archetype: archetype.label,
+      consent,
+      emotions,
+      dialogueStyle: archetype.dialogueStyle,
+      touchStyle: archetype.touchStyle,
+      aftercareNeeded: archetype.aftercareNeeded && toneProfile.roughness > 0.5,
+      
+      // Metadata for other systems
+      animationParams: {
+        speed: toneProfile.speed,
+        roughness: toneProfile.roughness,
+        eyeContact: toneProfile.eyeContact,
+        kissFrequency: toneProfile.kissFrequency,
+        touchGentleness: toneProfile.touchGentleness,
+      },
+      audioParams: {
+        dialogueIntensity: toneProfile.dialogueIntensity,
+        verbalAffection: toneProfile.verbalAffection,
+        degradation: toneProfile.degradation,
+        pain: toneProfile.painFocus,
+      },
+    };
+  }
+
+  /**
+   * Select emotional reactions based on context
+   */
+  generateEmotionalContext(archetype, toneId, relationship, intensity) {
+    // Available emotions from archetype
+    const available = archetype.emotionalRange || [];
+    
+    // Select 2-3 emotions that match the current tone
+    const toneEmotionMap = {
+      tender: ['love', 'tenderness', 'vulnerability'],
+      passionate: ['love', 'ecstasy', 'vulnerability'],
+      playful: ['submission', 'dominance'],
+      desperate: ['desperation', 'guilt', 'ecstasy'],
+      rough: ['dominance', 'submission', 'ecstasy'],
+      reverent: ['love', 'tenderness', 'vulnerability'],
+      commanding: ['dominance', 'submission'],
+      guilty: ['guilt', 'vulnerability', 'desperation'],
+      aggressive: ['dominance', 'desperation'],
+      sarcastic: ['dominance', 'submission'],
+    };
+
+    const toneEmotions = toneEmotionMap[toneId] || ['ecstasy'];
+    
+    // Filter to only available emotions for this archetype
+    const matched = toneEmotions.filter(e => available.includes(e));
+    
+    // Pick 2
+    const selected = matched.length >= 2 
+      ? matched.slice(0, 2)
+      : [...matched, 'ecstasy'];
+
+    // Build reaction objects
+    return selected.map(emotionId => {
+      const reaction = this.EMOTIONAL_REACTIONS[emotionId];
+      if (!reaction) return null;
+      
+      // Pick a dialogue line based on intensity
+      const dialogueIndex = Math.min(
+        Math.floor(intensity / 3) % reaction.dialogue.length,
+        reaction.dialogue.length - 1
+      );
+
+      return {
+        emotion: emotionId,
+        dialogue: reaction.dialogue[dialogueIndex],
+        physicalCues: reaction.physicalCues,
+        breathing: reaction.breathingPattern,
+      };
+    }).filter(Boolean);
+  }
+
+  /**
+   * Build consent model for the scene
+   */
+  buildConsentModel(archetype, toneId, trust) {
+    const baseRequirement = archetype.consentRequired || 'explicit';
+    
+    // Higher trust + known archetypes = smoother consent flow
+    let consentStyle = baseRequirement;
+    
+    if (trust > 80 && ['lovers', 'dominantSubmissive', 'ownerOwned'].includes(archetype)) {
+      consentStyle = 'pre-negotiated-with-safewords';
+    }
+
+    // Build check-in points based on roughness
+    const checkinPoints = [];
+    if (this.TONES[toneId]?.roughness > 0.5) {
+      checkinPoints.push('before-start');
+      checkinPoints.push('after-first-intense-moment');
+      checkinPoints.push('mid-scene-verbal-check');
+      checkinPoints.push('after-climax');
+    }
+
+    return {
+      style: consentStyle,
+      checkinPoints,
+      safewordRequired: this.TONES[toneId]?.roughness > 0.6,
+      canWithdrawAnytime: true,
+      nonVerbalCues: trust > 60, // Read body language if trust is established
+    };
+  }
+
+  /**
+   * Find the closest allowed tone to a requested one
+   */
+  findClosestTone(requestedId, allowedTones) {
+    // Tone similarity groups
+    const groups = {
+      tender: ['tender', 'reverent', 'passionate'],
+      passionate: ['passionate', 'tender', 'desperate'],
+      playful: ['playful', 'teasing', 'sarcastic'],
+      desperate: ['desperate', 'rough', 'guilty'],
+      rough: ['rough', 'aggressive', 'commanding', 'desperate'],
+      reverent: ['reverent', 'tender', 'passionate'],
+      commanding: ['commanding', 'rough', 'dominant'],
+      guilty: ['guilty', 'desperate', 'tender'],
+      aggressive: ['aggressive', 'rough', 'commanding'],
+      sarcastic: ['sarcastic', 'playful', 'rough'],
+    };
+
+    // Find the requested group
+    const group = groups[requestedId] || [requestedId];
+    
+    // Find first allowed match
+    for (const tone of group) {
+      if (allowedTones.includes(tone)) return tone;
+    }
+
+    // Fallback to first allowed
+    return allowedTones[0] || 'tender';
+  }
+
+  /**
+   * Get a specific dialogue line for the current scene moment
+   * Called when the action system triggers a movement phase
+   */
+  getDialogueForMoment(toneResult, momentType, partnerName) {
+    const { emotions, toneProfile } = toneResult;
+    
+    if (!emotions || emotions.length === 0) return null;
+
+    // Pick the dominant emotion
+    const primaryEmotion = emotions[0];
+    if (!primaryEmotion) return null;
+
+    // Modulate dialogue based on roughness
+    if (toneProfile.roughness > 0.6 && Math.random() < toneProfile.degradation) {
+      // Rough degradation dialogue (still emotionally grounded)
+      const degradationLines = {
+        dominant: [`Take it. Take all of it ${partnerName}.`, `You were made for this.`],
+        submissive: [`Please let me earn it.`, `Use me however you need.`],
+      };
+      
+      const lines = degradationLines[toneResult.touchStyle] || degradationLines.dominant;
+      return lines[Math.floor(Math.random() * lines.length)];
+    }
+
+    // Standard emotional dialogue
+    return primaryEmotion.dialogue;
+  }
+
+  /**
+   * Check if a specific action is appropriate for the current tone
+   * Used by the action system to filter available moves
+   */
+  isActionAllowed(toneResult, actionType) {
+    const roughness = toneResult.toneProfile.roughness;
+    
+    const actionCategories = {
+      tender: ['touch', 'kiss', 'caress', 'whisper', 'eye-contact'],
+      medium: ['thrust', 'bite', 'grip', 'pull-hair'],
+      rough: ['spank', 'choke', 'degrade', 'force', 'restrain'],
+    };
+
+    if (roughness < 0.3) {
+      return actionCategories.tender.includes(actionType);
+    } else if (roughness < 0.7) {
+      return [...actionCategories.tender, ...actionCategories.medium].includes(actionType);
+    } else {
+      return Object.values(actionCategories).flat().includes(actionType);
+    }
+  }
+}
+
+// Register and export
+window.NarrativeTone = new NarrativeToneSystem();
+ECS.registerSystem(window.NarrativeTone);

@@ -1,0 +1,405 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  firstName String?
+  lastName  String?
+  avatar    String?
+  
+  role      UserRole @default(USER)
+  status    UserStatus @default(ACTIVE)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  storyboards   Storyboard[]
+  characters    Character[]
+  stories       Story[]
+  auditLogs     AuditLog[]
+  apiKeys       ApiKey[]
+  userApiKeys   UserApiKey[]
+  mediaAssets   MediaAsset[]
+  
+  @@index([email])
+  @@index([username])
+}
+
+model Storyboard {
+  id        String   @id @default(cuid())
+  title     String
+  description String?
+  thumbnail String?
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  characters Character[]
+  scenes     Scene[]
+  
+  status    StoryboardStatus @default(DRAFT)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  publishedAt DateTime?
+  
+  @@index([userId])
+  @@index([status])
+}
+
+model Character {
+  id        String   @id @default(cuid())
+  name      String
+  description String?
+  imageUrl  String
+  
+  personality String? // JSON string with traits
+  appearance  String? // JSON string with physical details
+  background  String? // Character backstory
+  traits      String? // JSON array of traits
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  storyboards Storyboard[]
+  sceneCharacters SceneCharacter[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([name])
+}
+
+model Story {
+  id        String   @id @default(cuid())
+  title     String
+  prompt    String
+  content   String // Generated story text
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  genre     StoryGenre
+  contentRating ContentRating
+  tags      String[] // Array of tags
+  
+  characters String[] // Array of character IDs used in story
+  
+  scenes    Scene[]
+  mediaAssets MediaAsset[]
+
+  status    StoryStatus @default(DRAFT)
+  nsfwScore Float @default(1.0)
+  nsfwFlagged Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  publishedAt DateTime?
+  
+  @@index([userId])
+  @@index([genre])
+  @@index([contentRating])
+}
+
+model Scene {
+  id        String   @id @default(cuid())
+  title     String
+  description String?
+  sceneNumber Int
+  
+  storyId   String
+  story     Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  
+  storyboardId String?
+  storyboard   Storyboard? @relation(fields: [storyboardId], references: [id], onDelete: SetNull)
+  
+  characters SceneCharacter[]
+  
+  imageUrl  String?
+  videoUrl  String?
+  
+  generationJobId String?
+  generationJob   GenerationJob? @relation(fields: [generationJobId], references: [id])
+  
+  prompt    String?
+  motionStrength Float @default(0.7)
+  duration  Int @default(5)
+  
+  status    SceneStatus @default(PENDING)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([storyId])
+  @@index([storyboardId])
+  @@index([status])
+}
+
+model SceneCharacter {
+  id        String   @id @default(cuid())
+  
+  sceneId   String
+  scene     Scene     @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  
+  roleInScene String? // e.g., "protagonist", "antagonist", "love_interest"
+  dialogues   String? // JSON array of dialogue lines
+  actions     String? // JSON array of actions/movements
+  
+  @@unique([sceneId, characterId])
+  @@index([sceneId])
+  @@index([characterId])
+}
+
+model GenerationJob {
+  id        String   @id @default(cuid())
+  
+  sceneId   String
+  scenes    Scene[]
+  
+  provider  VideoProvider
+  status    JobStatus @default(QUEUED)
+  progress  Int @default(0)
+  
+  prompt    String
+  imageUrl  String
+  motionStrength Float
+  duration  Int
+  
+  resultVideoUrl String?
+  resultThumbnail String?
+  
+  errorMessage String?
+  retryCount Int @default(0)
+  maxRetries Int @default(3)
+  
+  metadata  String? // JSON string with additional metadata
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  completedAt DateTime?
+  
+  @@index([status])
+  @@index([provider])
+  @@index([createdAt])
+}
+
+model NSFWCheck {
+  id        String   @id @default(cuid())
+  
+  contentType ContentCheckType
+  contentId   String
+  
+  imageUrl  String?
+  videoUrl  String?
+  
+  tensorflowScore Float?
+  openaiScore Float?
+  customScore Float?
+  
+  isFlagged Boolean @default(false)
+  action    NSFWAction @default(FLAG)
+  
+  checkedAt DateTime @default(now())
+  flaggedAt DateTime?
+  
+  @@index([contentType, contentId])
+  @@index([isFlagged])
+  @@index([checkedAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  action    String
+  entityType String
+  entityId  String
+  changes   String? // JSON string with before/after values
+  
+  ipAddress String?
+  userAgent String?
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+model ApiKey {
+  id        String   @id @default(cuid())
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  key       String   @unique
+  name      String
+  
+  lastUsed  DateTime?
+  expiresAt DateTime?
+  
+  isActive  Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([key])
+}
+
+model UserApiKey {
+  id        String   @id @default(cuid())
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  provider  String   // "openai", "runway", "pika", "elevenlabs", "replicate"
+  key       String   // Encrypted or plain-text API key
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([userId, provider])
+  @@index([userId])
+  @@index([provider])
+}
+
+model MediaAsset {
+  id        String   @id @default(cuid())
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  url       String   // URL or base64 data URI of the uploaded media
+  assetType MediaAssetType @default(IMAGE) // IMAGE or VIDEO
+  
+  label     String?  // User-friendly label (e.g., "Character A shot")
+  description String? // Auto-generated or user-provided description
+  metadata  String?  // JSON string with additional metadata (dimensions, etc.)
+
+  storyId   String?  // Optional link to a story this asset is used in
+  story     Story?   @relation(fields: [storyId], references: [id], onDelete: SetNull)
+
+  sceneOrder Int?    // Order in the story scene sequence
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([storyId])
+  @@index([assetType])
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  CREATOR
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum StoryboardStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum StoryGenre {
+  ROMANCE
+  FANTASY
+  SCI_FI
+  DRAMA
+  MYSTERY
+  ADVENTURE
+  EROTICA
+  THRILLER
+  HORROR
+  COMEDY
+  OTHER
+  BANGLA_INCEST_CHOTI
+}
+
+enum ContentRating {
+  G
+  PG
+  PG_13
+  R
+  NC_17
+  X
+  XXX
+}
+
+enum StoryStatus {
+  DRAFT
+  IN_PROGRESS
+  COMPLETED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SceneStatus {
+  PENDING
+  PROCESSING
+  GENERATING_VIDEO
+  COMPLETED
+  FAILED
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  GENERATING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum VideoProvider {
+  RUNWAY
+  PIKA
+  COGVIDEOX
+}
+
+enum ContentCheckType {
+  STORY
+  SCENE
+  VIDEO
+  IMAGE
+}
+
+enum NSFWAction {
+  ALLOW
+  FLAG
+  BLOCK
+  BLUR
+}
+
+enum MediaAssetType {
+  IMAGE
+  VIDEO
+}
