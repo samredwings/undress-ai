@@ -33,6 +33,8 @@ export const generateOutfit = action({
         projectId: args.projectId,
       });
       if (!project) throw new Error("Project not found");
+      if (!project.originalImageUrl)
+        throw new Error("Project image is missing");
 
       // Get generation details for garment image
       const generations = await ctx.runQuery(api.generations.listByProject, {
@@ -83,19 +85,19 @@ export const generateOutfit = action({
         );
       }
 
-      // Convert result to base64 data URL
+      // Store the result in Convex file storage
       const resultBuffer = await response.arrayBuffer();
-      const resultBase64 = Buffer.from(resultBuffer).toString("base64");
       const contentType = response.headers.get("content-type") || "image/png";
-      const dataUrl = `data:${contentType};base64,${resultBase64}`;
+      const resultBlob = new Blob([resultBuffer], { type: contentType });
+      const resultImageStorageId = await ctx.storage.store(resultBlob);
 
-      // Update the generation with the result
       await ctx.runMutation(api.generations.updateResult, {
         generationId: args.generationId,
-        resultImageUrl: dataUrl,
+        resultImageStorageId,
       });
 
-      return { success: true, imageUrl: dataUrl };
+      const imageUrl = await ctx.storage.getUrl(resultImageStorageId);
+      return { success: true, imageUrl };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";

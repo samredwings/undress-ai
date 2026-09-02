@@ -14,18 +14,10 @@ import {
   Loader2,
   Image as ImageIcon,
   LogOut,
-  Upload,
+  Shirt,
+  X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 interface ChatMessage {
   id: string;
@@ -33,6 +25,27 @@ interface ChatMessage {
   content: string;
   imageUrl?: string;
   timestamp: number;
+}
+
+interface GarmentSelection {
+  storageId: Id<"_storage">;
+  name: string;
+  previewUrl: string;
+}
+
+async function uploadFileToStorage(
+  file: File,
+  generateUploadUrl: () => Promise<string>,
+): Promise<Id<"_storage">> {
+  const uploadUrl = await generateUploadUrl();
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!response.ok) throw new Error(`Upload failed (${response.status})`);
+  const { storageId } = (await response.json()) as { storageId: string };
+  return storageId as Id<"_storage">;
 }
 
 export default function Editor() {
@@ -48,6 +61,7 @@ export default function Editor() {
     api.generations.listByProject,
     projectId ? { projectId } : "skip",
   );
+  const generateUploadUrl = useMutation(api.projects.generateUploadUrl);
   const createGeneration = useMutation(api.generations.create);
   const generateOutfit = useAction(api.generate.generateOutfit);
 
@@ -55,13 +69,58 @@ export default function Editor() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeResult, setActiveResult] = useState<string | null>(null);
-  const [garmentImage, setGarmentImage] = useState<string | null>(null);
+  const [garmentImage, setGarmentImage] = useState<GarmentSelection | null>(
+    null,
+  );
   const garmentInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
+
+  const handleGarmentFile = useCallback(
+    async (file: File) => {
+      if (!file.type.startsWith("image/")) return;
+      try {
+        const storageId = await uploadFileToStorage(
+          file,
+          generateUploadUrl,
+        );
+        setGarmentImage({
+          storageId,
+          name: file.name,
+          previewUrl: URL.createObjectURL(file),
+        });
+      } catch (err) {
+        console.error("Garment upload failed:", err);
+      }
+    },
+    [generateUploadUrl],
+  );
+
+  const handleGarmentUpload = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) handleGarmentFile(file);
+      e.target.value = "";
+    },
+    [handleGarmentFile],
+  );
+
+  const handleGarmentDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const file = e.dataTransfer.files[0];
+      if (file) handleGarmentFile(file);
+    },
+    [handleGarmentFile],
+  );
+
+  const removeGarment = useCallback(() => {
+    if (garmentImage) URL.revokeObjectURL(garmentImage.previewUrl);
+    setGarmentImage(null);
+  }, [garmentImage]);
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim() || !projectId || isGenerating) return;
@@ -80,7 +139,9 @@ export default function Editor() {
       const generationId = await createGeneration({
         projectId,
         prompt: prompt.trim(),
-        ...(garmentImage && { garmentImageUrl: garmentImage }),
+        ...(garmentImage && {
+          garmentImageStorageId: garmentImage.storageId,
+        }),
       });
 
       // Add assistant thinking message
@@ -106,7 +167,7 @@ export default function Editor() {
             ? {
                 ...msg,
                 content: "Here's your outfit change. Want to adjust anything?",
-                imageUrl: result.imageUrl,
+                imageUrl: result.imageUrl ?? undefined,
               }
             : msg,
         ),
@@ -116,7 +177,7 @@ export default function Editor() {
         setActiveResult(result.imageUrl);
       }
 
-      setGarmentImage(null);
+      removeGarment();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Generation failed";
@@ -139,23 +200,9 @@ export default function Editor() {
     createGeneration,
     generateOutfit,
     garmentImage,
+    removeGarment,
     scrollToBottom,
   ]);
-
-  const handleGarmentUpload = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      try {
-        const dataUrl = await fileToDataUrl(file);
-        setGarmentImage(dataUrl);
-      } catch (err) {
-        console.error("Garment upload failed:", err);
-      }
-      e.target.value = "";
-    },
-    [],
-  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -172,7 +219,7 @@ export default function Editor() {
 
   if (project === null) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background gap-4">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
         <p className="text-sm text-muted-foreground">Project not found</p>
         <Button variant="ghost" onClick={() => navigate("/dashboard")}>
           Back to dashboard
@@ -189,7 +236,7 @@ export default function Editor() {
           <Button
             variant="ghost"
             size="icon"
-            className="cursor-pointer size-8"
+            className="size-8 cursor-pointer"
             onClick={() => navigate("/dashboard")}
           >
             <ArrowLeft className="size-4" />
@@ -255,7 +302,7 @@ export default function Editor() {
               </div>
             ) : (
               <img
-                src={project.originalImageUrl}
+                src={project.originalImageUrl ?? undefined}
                 alt={project.title}
                 className="max-h-full rounded-2xl object-contain"
               />
@@ -278,7 +325,7 @@ export default function Editor() {
                   onClick={() => setActiveResult(null)}
                 >
                   <img
-                    src={project.originalImageUrl}
+                    src={project.originalImageUrl ?? undefined}
                     alt="Original"
                     className="size-full object-cover"
                   />
@@ -296,7 +343,7 @@ export default function Editor() {
                       onClick={() => setActiveResult(gen.resultImageUrl!)}
                     >
                       <img
-                        src={gen.resultImageUrl}
+                        src={gen.resultImageUrl ?? undefined}
                         alt={gen.prompt}
                         className="size-full object-cover"
                       />
@@ -365,32 +412,54 @@ export default function Editor() {
 
           {/* Input Area */}
           <div className="shrink-0 border-t border-border/50 p-4">
-            {/* Garment Image Preview */}
-            {garmentImage && (
-              <div className="mb-3 flex items-center gap-3 rounded-xl bg-muted/50 px-3 py-2">
-                <img
-                  src={garmentImage}
-                  alt="Garment reference"
-                  className="size-10 rounded-lg object-cover"
-                />
-                <div className="flex-1">
-                  <p className="text-xs font-medium">Garment reference</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    Will be used as style reference
-                  </p>
+            {/* Custom attire upload box */}
+            <div
+              className="mb-3 cursor-pointer rounded-xl border-2 border-dashed border-border/60 bg-muted/20 px-4 py-3 transition-colors hover:border-border hover:bg-muted/40"
+              onClick={() => garmentInputRef.current?.click()}
+              onDrop={handleGarmentDrop}
+              onDragOver={(e) => e.preventDefault()}
+            >
+              {garmentImage ? (
+                <div className="flex items-center gap-3">
+                  <img
+                    src={garmentImage.previewUrl}
+                    alt="Garment reference"
+                    className="size-12 shrink-0 rounded-lg border border-border/50 object-cover"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium">Garment reference</p>
+                    <p className="truncate text-[10px] text-muted-foreground">
+                      {garmentImage.name}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeGarment();
+                    }}
+                    aria-label="Remove garment"
+                  >
+                    <X className="size-3.5" />
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-6 cursor-pointer"
-                  onClick={() => setGarmentImage(null)}
-                >
-                  ×
-                </Button>
-              </div>
-            )}
-
-            <div className="flex items-end gap-2">
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <Shirt className="size-4 text-muted-foreground" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-medium">
+                      Custom attire (optional)
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      Drop a garment photo here or click to upload
+                    </p>
+                  </div>
+                </div>
+              )}
               <input
                 ref={garmentInputRef}
                 type="file"
@@ -398,15 +467,9 @@ export default function Editor() {
                 className="hidden"
                 onChange={handleGarmentUpload}
               />
-              <Button
-                variant="outline"
-                size="icon"
-                className="shrink-0 cursor-pointer"
-                onClick={() => garmentInputRef.current?.click()}
-                title="Upload garment reference"
-              >
-                <Upload className="size-4" />
-              </Button>
+            </div>
+
+            <div className="flex items-end gap-2">
               <Textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}

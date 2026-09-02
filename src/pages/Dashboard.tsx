@@ -16,24 +16,18 @@ import {
   ArrowRight,
 } from "lucide-react";
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const projects = useQuery(api.projects.list);
+  const generateUploadUrl = useMutation(api.projects.generateUploadUrl);
   const createProject = useMutation(api.projects.create);
   const deleteProject = useMutation(api.projects.remove);
 
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSignOut = async () => {
@@ -45,21 +39,39 @@ export default function Dashboard() {
     async (file: File) => {
       if (!file.type.startsWith("image/")) return;
       setIsUploading(true);
+      setUploadError(null);
+      setPreviewUrl(URL.createObjectURL(file));
       try {
-        const dataUrl = await fileToDataUrl(file);
-        const title = file.name.replace(/\.[^.]+$/, "") || "Untitled";
+        const uploadUrl = await generateUploadUrl();
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!response.ok) {
+          throw new Error(`Upload failed (${response.status})`);
+        }
+        const { storageId } = (await response.json()) as {
+          storageId: string;
+        };
         const projectId = await createProject({
-          title,
-          originalImageUrl: dataUrl,
+          title: file.name.replace(/\.[^.]+$/, "") || "Untitled",
+          storageId: storageId as Id<"_storage">,
         });
         navigate(`/editor/${projectId}`);
       } catch (err) {
         console.error("Upload failed:", err);
+        setUploadError(
+          err instanceof Error
+            ? err.message
+            : "Upload failed. Please try again.",
+        );
+        setPreviewUrl(null);
       } finally {
         setIsUploading(false);
       }
     },
-    [createProject, navigate],
+    [createProject, generateUploadUrl, navigate],
   );
 
   const handleDrop = useCallback(
@@ -170,13 +182,21 @@ export default function Dashboard() {
             }}
           />
           <div className="flex flex-col items-center gap-4">
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-muted">
-              {isUploading ? (
-                <div className="size-5 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
-              ) : (
-                <Upload className="size-6 text-muted-foreground" />
-              )}
-            </div>
+            {previewUrl ? (
+              <img
+                src={previewUrl}
+                alt="Upload preview"
+                className="max-h-48 rounded-xl border border-border/50 object-contain"
+              />
+            ) : (
+              <div className="flex size-14 items-center justify-center rounded-2xl bg-muted">
+                {isUploading ? (
+                  <div className="size-5 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+                ) : (
+                  <Upload className="size-6 text-muted-foreground" />
+                )}
+              </div>
+            )}
             <div>
               <p className="text-sm font-medium">
                 {isUploading
@@ -187,6 +207,11 @@ export default function Dashboard() {
                 PNG, JPG, or WebP — any size
               </p>
             </div>
+            {uploadError && (
+              <p className="text-xs font-medium text-destructive">
+                {uploadError}
+              </p>
+            )}
           </div>
         </div>
 
@@ -228,7 +253,7 @@ export default function Dashboard() {
                   >
                     <div className="relative aspect-[4/3] overflow-hidden bg-muted">
                       <img
-                        src={project.originalImageUrl}
+                        src={project.originalImageUrl ?? undefined}
                         alt={project.title}
                         className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                       />

@@ -36,8 +36,7 @@ const schema = defineSchema(
     projects: defineTable({
       userId: v.id("users"),
       title: v.string(),
-      originalImageUrl: v.string(),
-      thumbnailUrl: v.optional(v.string()),
+      originalImageStorageId: v.id("_storage"),
       createdAt: v.number(),
     }).index("by_user", ["userId"]),
 
@@ -46,8 +45,8 @@ const schema = defineSchema(
       projectId: v.id("projects"),
       userId: v.id("users"),
       prompt: v.string(),
-      garmentImageUrl: v.optional(v.string()),
-      resultImageUrl: v.optional(v.string()),
+      garmentImageStorageId: v.optional(v.id("_storage")),
+      resultImageStorageId: v.optional(v.id("_storage")),
       status: v.union(
         v.literal("pending"),
         v.literal("processing"),

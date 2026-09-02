@@ -9,11 +9,22 @@ async function getCurrentUserId(ctx: QueryCtx) {
 export const listByProject = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const generations = await ctx.db
       .query("generations")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .order("desc")
       .collect();
+    return Promise.all(
+      generations.map(async (gen) => ({
+        ...gen,
+        resultImageUrl: gen.resultImageStorageId
+          ? (await ctx.storage.getUrl(gen.resultImageStorageId)) ?? null
+          : null,
+        garmentImageUrl: gen.garmentImageStorageId
+          ? (await ctx.storage.getUrl(gen.garmentImageStorageId)) ?? null
+          : null,
+      })),
+    );
   },
 });
 
@@ -21,31 +32,30 @@ export const create = mutation({
   args: {
     projectId: v.id("projects"),
     prompt: v.string(),
-    garmentImageUrl: v.optional(v.string()),
+    garmentImageStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     const userId = await getCurrentUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-    const generationId = await ctx.db.insert("generations", {
+    return await ctx.db.insert("generations", {
       projectId: args.projectId,
       userId,
       prompt: args.prompt,
-      garmentImageUrl: args.garmentImageUrl,
+      garmentImageStorageId: args.garmentImageStorageId,
       status: "pending",
       createdAt: Date.now(),
     });
-    return generationId;
   },
 });
 
 export const updateResult = mutation({
   args: {
     generationId: v.id("generations"),
-    resultImageUrl: v.string(),
+    resultImageStorageId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.generationId, {
-      resultImageUrl: args.resultImageUrl,
+      resultImageStorageId: args.resultImageStorageId,
       status: "completed",
     });
   },
