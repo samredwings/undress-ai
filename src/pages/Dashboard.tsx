@@ -117,7 +117,7 @@ export default function Dashboard() {
     <main className="min-h-screen bg-background text-foreground">
       {/* Header */}
       <nav className="sticky top-0 z-40 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
             <div
               className="flex size-8 cursor-pointer items-center justify-center rounded-lg bg-foreground"
@@ -147,7 +147,7 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      <div className="mx-auto max-w-6xl px-6 py-10">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         {/* Page Header */}
         <div className="mb-10">
           <h1 className="text-3xl font-semibold tracking-tight">
@@ -160,7 +160,7 @@ export default function Dashboard() {
 
         {/* Upload Zone */}
         <div
-          className={`mb-12 cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center transition-all ${
+          className={`mb-12 cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-all sm:p-12 ${
             dragActive
               ? "border-foreground bg-muted/50"
               : "border-border/60 hover:border-border hover:bg-muted/20"

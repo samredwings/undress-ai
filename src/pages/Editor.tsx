@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -9,12 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ArrowLeft,
+  Image as ImageIcon,
+  Loader2,
+  LogOut,
+  Paperclip,
   Send,
   Wand2,
-  Loader2,
-  Image as ImageIcon,
-  LogOut,
-  Shirt,
   X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -48,6 +48,28 @@ async function uploadFileToStorage(
   return storageId as Id<"_storage">;
 }
 
+/** Small animated typing indicator, like real AI chat apps. */
+function TypingIndicator() {
+  return (
+    <div className="flex items-start gap-2">
+      <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground">
+        <Wand2 className="size-3.5 text-background" />
+      </div>
+      <div className="flex items-center gap-1.5 rounded-2xl rounded-tl-sm bg-muted px-4 py-3.5">
+        <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground" />
+        <span
+          className="size-1.5 animate-bounce rounded-full bg-muted-foreground"
+          style={{ animationDelay: "150ms" }}
+        />
+        <span
+          className="size-1.5 animate-bounce rounded-full bg-muted-foreground"
+          style={{ animationDelay: "300ms" }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function Editor() {
   const { projectId } = useParams<{ projectId: Id<"projects"> }>();
   const navigate = useNavigate();
@@ -74,19 +96,27 @@ export default function Editor() {
   );
   const garmentInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const promptRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
+  // Auto-scroll to the newest message like a real chat app
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages.length, isGenerating, scrollToBottom]);
+
+  // Keep focus in the input after sending so the user can keep chatting
+  useEffect(() => {
+    if (!isGenerating) promptRef.current?.focus();
+  }, [isGenerating]);
+
   const handleGarmentFile = useCallback(
     async (file: File) => {
       if (!file.type.startsWith("image/")) return;
       try {
-        const storageId = await uploadFileToStorage(
-          file,
-          generateUploadUrl,
-        );
+        const storageId = await uploadFileToStorage(file, generateUploadUrl);
         setGarmentImage({
           storageId,
           name: file.name,
@@ -104,15 +134,6 @@ export default function Editor() {
       const file = e.target.files?.[0];
       if (file) handleGarmentFile(file);
       e.target.value = "";
-    },
-    [handleGarmentFile],
-  );
-
-  const handleGarmentDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      const file = e.dataTransfer.files[0];
-      if (file) handleGarmentFile(file);
     },
     [handleGarmentFile],
   );
@@ -144,34 +165,22 @@ export default function Editor() {
         }),
       });
 
-      // Add assistant thinking message
-      const thinkingMessage: ChatMessage = {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        content: "Generating your outfit change...",
-        timestamp: Date.now(),
-      };
-      setMessages((prev) => [...prev, thinkingMessage]);
-      scrollToBottom();
-
       const result = await generateOutfit({
         generationId,
         projectId,
         prompt: prompt.trim(),
       });
 
-      // Replace thinking message with result
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === thinkingMessage.id
-            ? {
-                ...msg,
-                content: "Here's your outfit change. Want to adjust anything?",
-                imageUrl: result.imageUrl ?? undefined,
-              }
-            : msg,
-        ),
-      );
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          content: "Here's your outfit change. Want to adjust anything?",
+          imageUrl: result.imageUrl ?? undefined,
+          timestamp: Date.now(),
+        },
+      ]);
 
       if (result.imageUrl) {
         setActiveResult(result.imageUrl);
@@ -182,7 +191,7 @@ export default function Editor() {
       const errorMessage =
         error instanceof Error ? error.message : "Generation failed";
       setMessages((prev) => [
-        ...prev.filter((m) => !m.content.includes("Generating")),
+        ...prev,
         {
           id: `error-${Date.now()}`,
           role: "assistant",
@@ -201,7 +210,6 @@ export default function Editor() {
     generateOutfit,
     garmentImage,
     removeGarment,
-    scrollToBottom,
   ]);
 
   const handleSignOut = async () => {
@@ -211,7 +219,7 @@ export default function Editor() {
 
   if (project === undefined) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-dvh items-center justify-center bg-background">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     );
@@ -219,7 +227,7 @@ export default function Editor() {
 
   if (project === null) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background">
         <p className="text-sm text-muted-foreground">Project not found</p>
         <Button variant="ghost" onClick={() => navigate("/dashboard")}>
           Back to dashboard
@@ -228,24 +236,27 @@ export default function Editor() {
     );
   }
 
+  const currentImage = activeResult ?? project.originalImageUrl ?? undefined;
+
   return (
-    <div className="flex h-screen flex-col bg-background text-foreground">
+    <div className="flex h-dvh flex-col bg-background text-foreground">
       {/* Header */}
-      <nav className="flex h-14 shrink-0 items-center justify-between border-b border-border/50 bg-background/80 px-4 backdrop-blur-xl">
-        <div className="flex items-center gap-3">
+      <nav className="flex h-14 shrink-0 items-center justify-between border-b border-border/50 bg-background/80 px-3 backdrop-blur-xl sm:px-4">
+        <div className="flex min-w-0 items-center gap-2">
           <Button
             variant="ghost"
             size="icon"
-            className="size-8 cursor-pointer"
+            className="size-9 shrink-0 cursor-pointer"
             onClick={() => navigate("/dashboard")}
+            aria-label="Back to dashboard"
           >
             <ArrowLeft className="size-4" />
           </Button>
-          <div className="flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-md bg-foreground">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-foreground">
               <Wand2 className="size-3.5 text-background" />
             </div>
-            <span className="text-sm font-semibold tracking-tight">
+            <span className="truncate text-sm font-semibold tracking-tight">
               {project.title}
             </span>
           </div>
@@ -257,72 +268,62 @@ export default function Editor() {
           onClick={handleSignOut}
         >
           <LogOut className="size-3.5" />
-          Sign out
+          <span className="hidden sm:inline">Sign out</span>
         </Button>
       </nav>
 
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* Content: image on top (mobile) / left (desktop), chat fills the rest */}
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* Image Panel */}
-        <div className="flex flex-1 flex-col border-r border-border/50 p-6">
-          <div className="relative flex flex-1 items-center justify-center rounded-2xl bg-muted/30">
-            {activeResult ? (
-              <div className="relative size-full">
-                <img
-                  src={activeResult}
-                  alt="Generated outfit"
-                  className="size-full rounded-2xl object-contain"
-                />
-                <div className="absolute bottom-4 left-4 flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="cursor-pointer gap-2 bg-background/80 backdrop-blur-sm"
-                    onClick={() => setActiveResult(null)}
-                  >
-                    <ImageIcon className="size-3.5" />
-                    Original
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="cursor-pointer gap-2 bg-background/80 backdrop-blur-sm"
-                    onClick={() => {
-                      if (activeResult) {
-                        const a = document.createElement("a");
-                        a.href = activeResult;
-                        a.download = `outfit-${Date.now()}.png`;
-                        a.click();
-                      }
-                    }}
-                  >
-                    Save
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <img
-                src={project.originalImageUrl ?? undefined}
-                alt={project.title}
-                className="max-h-full rounded-2xl object-contain"
-              />
-            )}
+        <section className="flex shrink-0 flex-col border-b border-border/50 bg-muted/10 md:w-[46%] md:shrink md:border-b-0 md:border-r md:bg-transparent">
+          <div className="relative flex h-[34dvh] min-h-0 items-center justify-center bg-muted/30 md:h-auto md:flex-1 md:p-6">
+            <img
+              src={currentImage}
+              alt={activeResult ? "Generated outfit" : project.title}
+              className="size-full object-contain"
+            />
+            <div className="absolute bottom-3 left-3 flex gap-2 md:bottom-4 md:left-4">
+              {activeResult && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-9 cursor-pointer gap-2 bg-background/85 px-3 backdrop-blur-sm"
+                  onClick={() => setActiveResult(null)}
+                >
+                  <ImageIcon className="size-3.5" />
+                  Original
+                </Button>
+              )}
+              {currentImage && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-9 cursor-pointer gap-2 bg-background/85 px-3 backdrop-blur-sm"
+                  onClick={() => {
+                    const a = document.createElement("a");
+                    a.href = currentImage;
+                    a.download = `outfit-${Date.now()}.png`;
+                    a.click();
+                  }}
+                >
+                  Save
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Generation History */}
           {generations && generations.length > 0 && (
-            <div className="mt-4">
-              <p className="mb-2 text-xs font-medium text-muted-foreground">
-                Recent generations
-              </p>
-              <div className="flex gap-2 overflow-x-auto pb-2">
+            <div className="shrink-0 px-3 py-2.5 md:px-6 md:py-3">
+              <div className="flex gap-2 overflow-x-auto pb-1">
                 <button
-                  className={`flex size-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 transition-all ${
+                  className={`flex size-14 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 transition-all md:size-16 ${
                     !activeResult
                       ? "border-foreground"
                       : "border-transparent hover:border-border"
                   }`}
                   onClick={() => setActiveResult(null)}
+                  aria-label="Show original photo"
                 >
                   <img
                     src={project.originalImageUrl ?? undefined}
@@ -335,12 +336,13 @@ export default function Editor() {
                   .map((gen) => (
                     <button
                       key={gen._id}
-                      className={`flex size-16 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 transition-all ${
+                      className={`flex size-14 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg border-2 transition-all md:size-16 ${
                         activeResult === gen.resultImageUrl
                           ? "border-foreground"
                           : "border-transparent hover:border-border"
                       }`}
                       onClick={() => setActiveResult(gen.resultImageUrl!)}
+                      aria-label={`Generation: ${gen.prompt}`}
                     >
                       <img
                         src={gen.resultImageUrl ?? undefined}
@@ -352,114 +354,101 @@ export default function Editor() {
               </div>
             </div>
           )}
-        </div>
+        </section>
 
         {/* Chat Panel */}
-        <div className="flex w-96 flex-col bg-background">
-          {/* Messages */}
-          <ScrollArea className="flex-1 px-4">
-            <div className="py-4">
-              {messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-muted">
-                    <Wand2 className="size-5 text-muted-foreground" />
-                  </div>
-                  <p className="text-sm font-medium">Describe your outfit</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Tell AI what outfit you want. Be as specific or creative as
-                    you like.
+        <section className="flex min-h-0 flex-1 flex-col">
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 py-4 sm:px-6">
+              {messages.length === 0 && !isGenerating && (
+                <div className="flex flex-col items-center justify-center gap-1 py-12 text-center sm:py-16">
+                  <p className="text-sm font-medium">Start a conversation</p>
+                  <p className="max-w-xs text-xs text-muted-foreground">
+                    Tell the editor what you'd like to change in the photo
+                    below.
                   </p>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  <AnimatePresence>
-                    {messages.map((msg) => (
-                      <motion.div
-                        key={msg.id}
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className={`flex flex-col ${
-                          msg.role === "user" ? "items-end" : "items-start"
+              )}
+
+              <AnimatePresence initial={false}>
+                {messages.map((msg) => (
+                  <motion.div
+                    key={msg.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className={`flex w-full gap-2 ${
+                      msg.role === "user"
+                        ? "justify-end"
+                        : "justify-start"
+                    }`}
+                  >
+                    {msg.role === "assistant" && (
+                      <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground">
+                        <Wand2 className="size-3.5 text-background" />
+                      </div>
+                    )}
+                    <div
+                      className={`max-w-[85%] sm:max-w-[75%] ${
+                        msg.role === "user" ? "items-end" : "items-start"
+                      }`}
+                    >
+                      <div
+                        className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                          msg.role === "user"
+                            ? "rounded-br-sm bg-foreground text-background"
+                            : "rounded-tl-sm bg-muted text-foreground"
                         }`}
                       >
-                        <div
-                          className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
-                            msg.role === "user"
-                              ? "bg-foreground text-background"
-                              : "bg-muted text-foreground"
-                          }`}
-                        >
-                          {msg.content}
+                        {msg.content}
+                      </div>
+                      {msg.imageUrl && (
+                        <div className="mt-2 overflow-hidden rounded-xl border border-border/50 bg-muted/20">
+                          <img
+                            src={msg.imageUrl}
+                            alt="Generated result"
+                            className="max-h-72 w-full object-contain sm:max-h-96"
+                          />
                         </div>
-                        {msg.imageUrl && (
-                          <div className="mt-2 overflow-hidden rounded-xl border border-border/50">
-                            <img
-                              src={msg.imageUrl}
-                              alt="Generated result"
-                              className="max-h-64 object-contain"
-                            />
-                          </div>
-                        )}
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {isGenerating && <TypingIndicator />}
+              <div ref={messagesEndRef} />
             </div>
           </ScrollArea>
 
-          {/* Input Area */}
-          <div className="shrink-0 border-t border-border/50 p-4">
-            {/* Custom attire upload box */}
-            <div
-              className="mb-3 cursor-pointer rounded-xl border-2 border-dashed border-border/60 bg-muted/20 px-4 py-3 transition-colors hover:border-border hover:bg-muted/40"
-              onClick={() => garmentInputRef.current?.click()}
-              onDrop={handleGarmentDrop}
-              onDragOver={(e) => e.preventDefault()}
-            >
-              {garmentImage ? (
-                <div className="flex items-center gap-3">
-                  <img
-                    src={garmentImage.previewUrl}
-                    alt="Garment reference"
-                    className="size-12 shrink-0 rounded-lg border border-border/50 object-cover"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium">Garment reference</p>
-                    <p className="truncate text-[10px] text-muted-foreground">
-                      {garmentImage.name}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-7 shrink-0 cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeGarment();
-                    }}
-                    aria-label="Remove garment"
-                  >
-                    <X className="size-3.5" />
-                  </Button>
+          {/* Chat Input (pinned to bottom) */}
+          <div className="shrink-0 border-t border-border/50 bg-background/80 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl sm:px-4">
+            {garmentImage && (
+              <div className="mb-2 flex items-center gap-2.5 rounded-xl border border-border/50 bg-muted/40 px-2.5 py-2">
+                <img
+                  src={garmentImage.previewUrl}
+                  alt="Garment reference"
+                  className="size-9 shrink-0 rounded-lg border border-border/50 object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium">Garment reference</p>
+                  <p className="truncate text-[10px] text-muted-foreground">
+                    {garmentImage.name}
+                  </p>
                 </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                    <Shirt className="size-4 text-muted-foreground" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-xs font-medium">
-                      Custom attire (optional)
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">
-                      Drop a garment photo here or click to upload
-                    </p>
-                  </div>
-                </div>
-              )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 shrink-0 cursor-pointer text-muted-foreground"
+                  onClick={removeGarment}
+                  aria-label="Remove garment"
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+            )}
+
+            <div className="flex items-end gap-1.5 rounded-2xl border border-border/60 bg-muted/30 p-1.5 transition-colors focus-within:border-border">
               <input
                 ref={garmentInputRef}
                 type="file"
@@ -467,14 +456,22 @@ export default function Editor() {
                 className="hidden"
                 onChange={handleGarmentUpload}
               />
-            </div>
-
-            <div className="flex items-end gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-9 shrink-0 cursor-pointer text-muted-foreground"
+                onClick={() => garmentInputRef.current?.click()}
+                title="Attach a garment photo as a style reference"
+                aria-label="Attach garment photo"
+              >
+                <Paperclip className="size-4" />
+              </Button>
               <Textarea
+                ref={promptRef}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe the outfit you want..."
-                className="min-h-[44px] max-h-32 resize-none rounded-xl border-border/60 bg-muted/30 focus-visible:ring-1 focus-visible:ring-foreground/20"
+                placeholder="Type your message…"
+                className="min-h-9 max-h-32 resize-none border-none bg-transparent px-2 py-2 text-base shadow-none focus-visible:ring-0 md:text-sm"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -484,9 +481,10 @@ export default function Editor() {
               />
               <Button
                 size="icon"
-                className="shrink-0 cursor-pointer"
+                className="size-9 shrink-0 cursor-pointer"
                 disabled={!prompt.trim() || isGenerating}
                 onClick={handleGenerate}
+                aria-label="Send message"
               >
                 {isGenerating ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -495,11 +493,11 @@ export default function Editor() {
                 )}
               </Button>
             </div>
-            <p className="mt-2 text-center text-[10px] text-muted-foreground/60">
-              Press Enter to send · Shift+Enter for new line
+            <p className="mt-2 hidden text-center text-[10px] text-muted-foreground/60 sm:block">
+              Press Enter to send · Shift+Enter for a new line
             </p>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
