@@ -3,14 +3,10 @@ import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Upload,
   LogOut,
@@ -87,10 +83,10 @@ export default function Dashboard() {
   }, []);
 
   const handleDelete = useCallback(
-    async (e: React.MouseEvent, projectId: string) => {
+    async (e: React.MouseEvent, projectId: Id<"projects">) => {
       e.stopPropagation();
       if (confirm("Delete this project?")) {
-        await deleteProject({ projectId: projectId as any });
+        await deleteProject({ projectId });
       }
     },
     [deleteProject],

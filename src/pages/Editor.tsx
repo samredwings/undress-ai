@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,17 +36,17 @@ interface ChatMessage {
 }
 
 export default function Editor() {
-  const { projectId } = useParams<{ projectId: string }>();
+  const { projectId } = useParams<{ projectId: Id<"projects"> }>();
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { signOut } = useAuth();
 
   const project = useQuery(
     api.projects.get,
-    projectId ? { projectId: projectId as any } : "skip",
+    projectId ? { projectId } : "skip",
   );
   const generations = useQuery(
     api.generations.listByProject,
-    projectId ? { projectId: projectId as any } : "skip",
+    projectId ? { projectId } : "skip",
   );
   const createGeneration = useMutation(api.generations.create);
   const generateOutfit = useAction(api.generate.generateOutfit);
@@ -77,7 +78,7 @@ export default function Editor() {
 
     try {
       const generationId = await createGeneration({
-        projectId: projectId as any,
+        projectId,
         prompt: prompt.trim(),
         ...(garmentImage && { garmentImageUrl: garmentImage }),
       });
@@ -94,7 +95,7 @@ export default function Editor() {
 
       const result = await generateOutfit({
         generationId,
-        projectId: projectId as any,
+        projectId,
         prompt: prompt.trim(),
       });
 
