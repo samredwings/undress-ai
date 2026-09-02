@@ -1,19 +1,19 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
+import { query, mutation, QueryCtx } from "./_generated/server";
+
+async function getCurrentUserId(ctx: QueryCtx) {
+  return await getAuthUserId(ctx);
+}
 
 export const list = query({
   args: {},
   handler: async (ctx) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
+    const userId = await getCurrentUserId(ctx);
     if (!userId) return [];
-    const user = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", userId))
-      .unique();
-    if (!user) return [];
     return await ctx.db
       .query("projects")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .collect();
   },
@@ -22,15 +22,10 @@ export const list = query({
 export const get = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
+    const userId = await getCurrentUserId(ctx);
     if (!userId) return null;
-    const user = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", userId))
-      .unique();
-    if (!user) return null;
     const project = await ctx.db.get(args.projectId);
-    if (!project || project.userId !== user._id) return null;
+    if (!project || project.userId !== userId) return null;
     return project;
   },
 });
@@ -41,15 +36,10 @@ export const create = mutation({
     originalImageUrl: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
+    const userId = await getCurrentUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-    const user = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", userId))
-      .unique();
-    if (!user) throw new Error("User not found");
     const projectId = await ctx.db.insert("projects", {
-      userId: user._id,
+      userId,
       title: args.title,
       originalImageUrl: args.originalImageUrl,
       createdAt: Date.now(),
@@ -61,15 +51,10 @@ export const create = mutation({
 export const remove = mutation({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
+    const userId = await getCurrentUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-    const user = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", userId))
-      .unique();
-    if (!user) throw new Error("User not found");
     const project = await ctx.db.get(args.projectId);
-    if (!project || project.userId !== user._id)
+    if (!project || project.userId !== userId)
       throw new Error("Not authorized");
     // Delete all generations for this project
     const generations = await ctx.db

@@ -1,5 +1,10 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
+import { query, mutation, QueryCtx } from "./_generated/server";
+
+async function getCurrentUserId(ctx: QueryCtx) {
+  return await getAuthUserId(ctx);
+}
 
 export const listByProject = query({
   args: { projectId: v.id("projects") },
@@ -19,16 +24,11 @@ export const create = mutation({
     garmentImageUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = (await ctx.auth.getUserIdentity())?.subject;
+    const userId = await getCurrentUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
-    const user = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", userId))
-      .unique();
-    if (!user) throw new Error("User not found");
     const generationId = await ctx.db.insert("generations", {
       projectId: args.projectId,
-      userId: user._id,
+      userId,
       prompt: args.prompt,
       garmentImageUrl: args.garmentImageUrl,
       status: "pending",
