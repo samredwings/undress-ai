@@ -9,6 +9,7 @@ import {
   downloadCivitaiImage,
   submitCivitaiImageJob,
 } from "./civitai";
+import { stabilityTextToImage } from "./generate";
 
 /**
  * Dedicated garment try-on. Uses Civitai's SDXL img2img (person photo as the
@@ -31,6 +32,7 @@ export const tryOnCustom = action({
       status: "processing",
     });
 
+    let usedCivitai = false;
     try {
       const token = process.env.CIVITAI_API_KEY;
       if (!token) {
@@ -41,6 +43,7 @@ export const tryOnCustom = action({
           prompt: args.prompt,
         });
       }
+      usedCivitai = true;
 
       const project = await ctx.runQuery(api.projects.get, {
         projectId: args.projectId,
@@ -74,6 +77,25 @@ export const tryOnCustom = action({
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
+      // If Civitai itself failed (e.g. insufficient Buzz) and Stability is
+      // available, retry the try-on through Stability's image-to-image path.
+      if (usedCivitai && process.env.STABILITY_API_KEY) {
+        try {
+          return await ctx.runAction(api.generate.generateOutfit, {
+            generationId: args.generationId,
+            projectId: args.projectId,
+            prompt: args.prompt,
+          });
+        } catch (stabilityError) {
+          const stabilityMessage =
+            stabilityError instanceof Error
+              ? stabilityError.message
+              : "unknown";
+          throw new Error(
+            `Civitai try-on failed (${errorMessage}) and Stability fallback failed (${stabilityMessage})`,
+          );
+        }
+      }
       await ctx.runMutation(api.generations.updateStatus, {
         generationId: args.generationId,
         status: "failed",
@@ -98,32 +120,73 @@ export const generateWardrobeAsset = action({
     ctx,
     args,
   ): Promise<{ imageUrl: string | null }> => {
-    const token = process.env.CIVITAI_API_KEY;
-    if (!token) throw new Error("CIVITAI_API_KEY not configured");
-
     const existing = await ctx.runQuery(api.wardrobe.getWardrobeAsset, {
       itemId: args.itemId,
     });
     if (existing?.imageUrl) return { imageUrl: existing.imageUrl };
 
-    const model = process.env.CIVITAI_TRYON_MODEL ?? DEFAULT_CIVITAI_MODEL;
-    const result = await submitCivitaiImageJob(
-      {
-        engine: "sdcpp",
-        ecosystem: "sdxl",
-        operation: "createImage",
-        model,
-        prompt: `professional e-commerce product photo of a single women's ${args.name}: ${args.prompt}, laid flat on a clean light gray studio background, centered, soft even lighting, sharp focus, high detail, realistic fabric texture`,
-        negativePrompt:
-          "worst quality, low quality, blurry, text, watermark, multiple items, people, hands, mannequin, model, duplicate, distorted",
-        width: 768,
-        height: 768,
-        cfgScale: 5,
-        steps: 12,
-      },
-      token,
-    );
-    const { buffer, contentType } = await downloadCivitaiImage(result, token);
+    const flatLayPrompt = `professional e-commerce product photo of a single women's ${args.name}: ${args.prompt}, laid flat on a clean light gray studio background, centered, soft even lighting, sharp focus, high detail, realistic fabric texture`;
+    const negativePrompt =
+      "worst quality, low quality, blurry, text, watermark, multiple items, people, hands, mannequin, model, duplicate, distorted";
+
+    // Try Civitai first (nice flat lays), fall back to Stability text-to-image
+    // so wardrobe photos don't consume Buzz.
+    let buffer: ArrayBuffer;
+    let contentType: string;
+
+    const civitaiToken = process.env.CIVITAI_API_KEY;
+    if (civitaiToken) {
+      try {
+        const model =
+          process.env.CIVITAI_TRYON_MODEL ?? DEFAULT_CIVITAI_MODEL;
+        const result = await submitCivitaiImageJob(
+          {
+            engine: "sdcpp",
+            ecosystem: "sdxl",
+            operation: "createImage",
+            model,
+            prompt: flatLayPrompt,
+            negativePrompt,
+            width: 768,
+            height: 768,
+            cfgScale: 5,
+            steps: 12,
+          },
+          civitaiToken,
+        );
+        const downloaded = await downloadCivitaiImage(result, civitaiToken);
+        buffer = downloaded.buffer;
+        contentType = downloaded.contentType;
+      } catch (civitaiError) {
+        const civitaiMessage =
+          civitaiError instanceof Error ? civitaiError.message : "unknown";
+        if (!process.env.STABILITY_API_KEY) {
+          throw new Error(
+            `Civitai failed (${civitaiMessage}) and STABILITY_API_KEY not configured for fallback`,
+          );
+        }
+        try {
+          const stability = await stabilityTextToImage(
+            flatLayPrompt,
+            negativePrompt,
+          );
+          buffer = stability.buffer;
+          contentType = stability.contentType;
+        } catch (stabilityError) {
+          const stabilityMessage =
+            stabilityError instanceof Error
+              ? stabilityError.message
+              : "unknown";
+          throw new Error(
+            `Civitai failed (${civitaiMessage}) and Stability fallback failed (${stabilityMessage})`,
+          );
+        }
+      }
+    } else {
+      const stability = await stabilityTextToImage(flatLayPrompt, negativePrompt);
+      buffer = stability.buffer;
+      contentType = stability.contentType;
+    }
 
     const imageStorageId = await ctx.storage.store(
       new Blob([buffer], { type: contentType }),

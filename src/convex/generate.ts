@@ -38,6 +38,46 @@ export const hasOpenAIKey = action({
   },
 });
 
+/**
+ * Text-to-image via Stability's Stable Image Core (mode: text-to-image).
+ * Used as a fallback for wardrobe product photos so Civitai Buzz isn't
+ * required for them.
+ */
+export async function stabilityTextToImage(
+  prompt: string,
+  negativePrompt?: string,
+): Promise<{ buffer: ArrayBuffer; contentType: string }> {
+  const apiKey = process.env.STABILITY_API_KEY;
+  if (!apiKey) throw new Error("STABILITY_API_KEY not configured");
+
+  const formData = new FormData();
+  formData.append("prompt", prompt);
+  if (negativePrompt) formData.append("negative_prompt", negativePrompt);
+  formData.append("mode", "text-to-image");
+  formData.append("aspect_ratio", "1:1");
+  formData.append("output_format", "png");
+
+  const response = await fetch(
+    "https://api.stability.ai/v2beta/stable-image/generate/core",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "image/*",
+      },
+      body: formData,
+    },
+  );
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Stability AI error: ${response.status} - ${errorText.slice(0, 300)}`,
+    );
+  }
+  const contentType = response.headers.get("content-type") || "image/png";
+  return { buffer: await response.arrayBuffer(), contentType };
+}
+
 async function fetchAsBase64(url: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch image: ${res.statusText}`);
