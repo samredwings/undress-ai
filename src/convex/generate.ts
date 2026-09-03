@@ -26,6 +26,17 @@ export const hasCivitaiKey = action({
   },
 });
 
+/**
+ * Diagnostic: returns whether the OpenAI (vision) API key is set in the
+ * server environment. Never returns the key itself.
+ */
+export const hasOpenAIKey = action({
+  args: {},
+  handler: async () => {
+    return !!process.env.OPENAI_API_KEY;
+  },
+});
+
 async function fetchAsBase64(url: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch image: ${res.statusText}`);
