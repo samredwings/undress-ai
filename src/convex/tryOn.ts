@@ -23,11 +23,16 @@ interface CivitaiWorkflow {
   }[];
 }
 
+interface CivitaiImageResult {
+  url: string;
+  workflowId: string | null;
+}
+
 /** Submit an imageGen workflow to Civitai and wait for the first result image. */
 async function submitCivitaiImageJob(
   input: Record<string, unknown>,
   token: string,
-): Promise<string> {
+): Promise<CivitaiImageResult> {
   const body = {
     steps: [{ $type: "imageGen", input }],
   };
@@ -68,14 +73,54 @@ async function submitCivitaiImageJob(
   }
   const url = step.output?.images?.[0]?.url;
   if (!url) throw new Error("Civitai returned no image");
-  return url;
+  return { url, workflowId: workflow.id ?? null };
+}
+
+/** Fetch a fresh result URL from a completed Civitai workflow. */
+async function refetchCivitaiWorkflow(
+  workflowId: string,
+  token: string,
+): Promise<string | null> {
+  const res = await fetch(
+    `${CIVITAI_ORCH_URL}/workflows/${workflowId}`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) return null;
+  const workflow = (await res.json()) as CivitaiWorkflow;
+  return workflow.steps?.[0]?.output?.images?.[0]?.url ?? null;
+}
+
+/**
+ * Download a Civitai result image. Blob URLs are signed and expire, so on a
+ * 403/404 we refetch the workflow for a fresh URL, then retry with the bearer
+ * token as a last resort.
+ */
+async function downloadCivitaiImage(
+  result: CivitaiImageResult,
+  token: string,
+): Promise<{ buffer: ArrayBuffer; contentType: string }> {
+  let res = await fetch(result.url);
+  if (!res.ok && result.workflowId) {
+    const fresh = await refetchCivitaiWorkflow(result.workflowId, token);
+    if (fresh) res = await fetch(fresh);
+  }
+  if (!res.ok) {
+    res = await fetch(result.url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  }
+  if (!res.ok) {
+    throw new Error(`Failed to download result (${res.status})`);
+  }
+  const contentType = res.headers.get("content-type") || "image/jpeg";
+  return { buffer: await res.arrayBuffer(), contentType };
 }
 
 async function runCivitaiTryOn(
   personImageUrl: string,
   prompt: string,
   token: string,
-): Promise<string> {
+): Promise<CivitaiImageResult> {
   const model = process.env.CIVITAI_TRYON_MODEL ?? DEFAULT_MODEL;
   return submitCivitaiImageJob(
     {
@@ -136,18 +181,17 @@ export const tryOnCustom = action({
       if (!project.originalImageUrl)
         throw new Error("Project image is missing");
 
-      const resultImageUrl = await runCivitaiTryOn(
+      const result = await runCivitaiTryOn(
         project.originalImageUrl,
         args.prompt,
         token,
       );
+      const { buffer, contentType } = await downloadCivitaiImage(
+        result,
+        token,
+      );
 
-      // Download the result and store it in Convex file storage
-      const download = await fetch(resultImageUrl);
-      if (!download.ok)
-        throw new Error(`Failed to download result (${download.status})`);
-      const buffer = await download.arrayBuffer();
-      const contentType = download.headers.get("content-type") || "image/jpeg";
+      // Store the result in Convex file storage
       const resultImageStorageId = await ctx.storage.store(
         new Blob([buffer], { type: contentType }),
       );
@@ -195,7 +239,7 @@ export const generateWardrobeAsset = action({
     if (existing?.imageUrl) return { imageUrl: existing.imageUrl };
 
     const model = process.env.CIVITAI_TRYON_MODEL ?? DEFAULT_MODEL;
-    const url = await submitCivitaiImageJob(
+    const result = await submitCivitaiImageJob(
       {
         engine: "sdcpp",
         ecosystem: "sdxl",
@@ -211,12 +255,8 @@ export const generateWardrobeAsset = action({
       },
       token,
     );
+    const { buffer, contentType } = await downloadCivitaiImage(result, token);
 
-    const download = await fetch(url);
-    if (!download.ok)
-      throw new Error(`Failed to download thumbnail (${download.status})`);
-    const buffer = await download.arrayBuffer();
-    const contentType = download.headers.get("content-type") || "image/jpeg";
     const imageStorageId = await ctx.storage.store(
       new Blob([buffer], { type: contentType }),
     );
