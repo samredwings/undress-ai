@@ -220,6 +220,60 @@ export const WARDROBE: WardrobeItem[] = [
     prompt:
       "black lace boyshorts with a satin bow",
   },
+  {
+    id: "string-thong",
+    name: "String Thong",
+    category: "bottom",
+    styles: ["sexy", "date night"],
+    emoji: "🎗️",
+    prompt:
+      "a string thong with a delicate lace waistband",
+  },
+  {
+    id: "g-string",
+    name: "G-String",
+    category: "bottom",
+    styles: ["sexy", "date night"],
+    emoji: "🎀",
+    prompt:
+      "a black G-string with adjustable side straps",
+  },
+  {
+    id: "seamless-thong",
+    name: "Seamless Thong",
+    category: "bottom",
+    styles: ["sexy", "minimal", "date night"],
+    emoji: "🍑",
+    prompt:
+      "a nude seamless thong, invisible under clothes",
+  },
+  {
+    id: "satin-panties",
+    name: "Satin Panties",
+    category: "bottom",
+    styles: ["sexy", "elegant", "date night"],
+    emoji: "🥀",
+    prompt:
+      "black satin panties with a small bow detail",
+  },
+  {
+    id: "brazilian-panties",
+    name: "Brazilian Panties",
+    category: "bottom",
+    styles: ["sexy", "date night"],
+    emoji: "🌶️",
+    prompt:
+      "a black Brazilian-cut panty with lace trim",
+  },
+  {
+    id: "low-rise-thong",
+    name: "Low-Rise Thong",
+    category: "bottom",
+    styles: ["sexy", "date night", "summer"],
+    emoji: "🪢",
+    prompt:
+      "a low-rise thong with a lacy waistband",
+  },
 ];
 
 /**
