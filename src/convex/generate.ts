@@ -15,6 +15,17 @@ export const hasStabilityKey = action({
   },
 });
 
+/**
+ * Diagnostic: returns whether the Civitai API key is set in the server
+ * environment. Never returns the key itself.
+ */
+export const hasCivitaiKey = action({
+  args: {},
+  handler: async () => {
+    return !!process.env.CIVITAI_API_KEY;
+  },
+});
+
 async function fetchAsBase64(url: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch image: ${res.statusText}`);
