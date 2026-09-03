@@ -3,6 +3,7 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { api } from "./_generated/api";
+import { civitaiCreateVariant, downloadCivitaiImage } from "./civitai";
 
 /**
  * Diagnostic: returns whether the Stability API key is set in the server
@@ -44,13 +45,21 @@ async function fetchAsBase64(url: string): Promise<string> {
   return Buffer.from(buffer).toString("base64");
 }
 
+/**
+ * Outfit change for wardrobe items and chat. Tries Stability's Stable Image
+ * Core img2img endpoint; if that fails and a Civitai key is configured, it
+ * retries via Civitai's SDXL img2img so generation survives either provider.
+ */
 export const generateOutfit = action({
   args: {
     generationId: v.id("generations"),
     projectId: v.id("projects"),
     prompt: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ success: boolean; imageUrl: string | null }> => {
     const apiKey = process.env.STABILITY_API_KEY;
     if (!apiKey) throw new Error("STABILITY_API_KEY not configured");
 
@@ -81,26 +90,31 @@ export const generateOutfit = action({
       // Fetch and encode the original image
       const imageBase64 = await fetchAsBase64(project.originalImageUrl);
 
-      // Build the request body
+      // Build the request body for Stable Image Core (img2img)
       const formData = new FormData();
-      const imageBytes = Uint8Array.from(atob(imageBase64), (c) => c.charCodeAt(0));
+      const imageBytes = Uint8Array.from(atob(imageBase64), (c) =>
+        c.charCodeAt(0),
+      );
       const imageBlob = new Blob([imageBytes], { type: "image/png" });
       formData.append("image", imageBlob, "image.png");
       formData.append("prompt", args.prompt);
-      formData.append("strength", "0.7");
+      formData.append("mode", "image-to-image");
+      formData.append("strength", "0.6");
       formData.append("output_format", "png");
 
       // If a garment reference image is provided, add it
       if (generation.garmentImageUrl) {
         const garmentBase64 = await fetchAsBase64(generation.garmentImageUrl);
-        const garmentBytes = Uint8Array.from(atob(garmentBase64), (c) => c.charCodeAt(0));
+        const garmentBytes = Uint8Array.from(atob(garmentBase64), (c) =>
+          c.charCodeAt(0),
+        );
         const garmentBlob = new Blob([garmentBytes], { type: "image/png" });
         formData.append("image", garmentBlob, "garment.png");
       }
 
-      // Call Stability AI image-to-image
+      // Call Stability AI Stable Image Core (image-to-image)
       const response = await fetch(
-        "https://api.stability.ai/v2beta/stable-image/edit/image-to-image",
+        "https://api.stability.ai/v2beta/stable-image/generate/core",
         {
           method: "POST",
           headers: {
@@ -114,7 +128,7 @@ export const generateOutfit = action({
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(
-          `Stability AI error: ${response.status} - ${errorText}`,
+          `Stability AI error: ${response.status} - ${errorText.slice(0, 300)}`,
         );
       }
 
@@ -132,6 +146,44 @@ export const generateOutfit = action({
       const imageUrl = await ctx.storage.getUrl(resultImageStorageId);
       return { success: true, imageUrl };
     } catch (error) {
+      // If Stability failed, retry via Civitai when a key is configured
+      const civitaiToken = process.env.CIVITAI_API_KEY;
+      if (civitaiToken) {
+        try {
+          const project = await ctx.runQuery(api.projects.get, {
+            projectId: args.projectId,
+          });
+          if (project?.originalImageUrl) {
+            const result = await civitaiCreateVariant(
+              project.originalImageUrl,
+              args.prompt,
+              civitaiToken,
+            );
+            const { buffer, contentType } = await downloadCivitaiImage(
+              result,
+              civitaiToken,
+            );
+            const resultImageStorageId = await ctx.storage.store(
+              new Blob([buffer], { type: contentType }),
+            );
+            await ctx.runMutation(api.generations.updateResult, {
+              generationId: args.generationId,
+              resultImageStorageId,
+            });
+            const imageUrl = await ctx.storage.getUrl(resultImageStorageId);
+            return { success: true, imageUrl };
+          }
+        } catch (fallbackError) {
+          const fallbackMessage =
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : "unknown";
+          throw new Error(
+            `Stability failed (${error instanceof Error ? error.message : "unknown"}) and Civitai fallback failed (${fallbackMessage})`,
+          );
+        }
+      }
+
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";
       await ctx.runMutation(api.generations.updateStatus, {
