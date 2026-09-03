@@ -12,204 +12,213 @@ export interface WardrobeItem {
   prompt: string;
 }
 
+/**
+ * Pre-built wardrobe: female-only bikinis, lingerie and sexy attire.
+ * "full" items are sets/one-pieces, "top" and "bottom" items mix & match.
+ */
 export const WARDROBE: WardrobeItem[] = [
-  // ── Full looks ────────────────────────────────────────────────
+  // ── Full looks: lingerie sets, bodysuits & slips ──────────────
   {
-    id: "silk-slip-dress",
-    name: "Silk Slip Dress",
+    id: "lace-lingerie-set",
+    name: "Lace Lingerie Set",
     category: "full",
-    styles: ["elegant", "minimal", "evening"],
+    styles: ["sexy", "elegant", "date night", "evening"],
+    emoji: "🖤",
+    prompt:
+      "an elegant black lace lingerie set with matching thong, delicate floral lace and adjustable straps",
+  },
+  {
+    id: "silk-babydoll",
+    name: "Silk Babydoll",
+    category: "full",
+    styles: ["sexy", "elegant", "date night"],
+    emoji: "🥂",
+    prompt:
+      "a sheer champagne silk babydoll with lace trim and ribbon ties",
+  },
+  {
+    id: "satin-corset-set",
+    name: "Satin Corset Set",
+    category: "full",
+    styles: ["sexy", "elegant", "date night"],
+    emoji: "🎀",
+    prompt:
+      "a black satin corset with lace-up back and matching panties",
+  },
+  {
+    id: "plunge-lace-bodysuit",
+    name: "Lace Bodysuit",
+    category: "full",
+    styles: ["sexy", "date night", "party"],
+    emoji: "🌹",
+    prompt:
+      "a deep-plunge black lace bodysuit with snap closure",
+  },
+  {
+    id: "sheer-teddy",
+    name: "Sheer Teddy",
+    category: "full",
+    styles: ["sexy", "date night"],
     emoji: "✨",
     prompt:
-      "an elegant champagne satin slip dress with delicate straps, refined evening look",
+      "a sheer mesh teddy with scalloped lace edges",
   },
   {
-    id: "oversized-blazer-set",
-    name: "Oversized Blazer Set",
+    id: "silk-robe-set",
+    name: "Silk Robe Set",
     category: "full",
-    styles: ["formal", "minimal", "office"],
-    emoji: "🧥",
+    styles: ["elegant", "sexy", "luxury"],
+    emoji: "🕊️",
     prompt:
-      "an oversized tailored blazer with matching wide-leg trousers, modern power suit",
+      "an ivory silk robe worn over a matching lace bra and panties set",
   },
   {
-    id: "streetwear-cargo-set",
-    name: "Streetwear Cargo Set",
+    id: "satin-slip",
+    name: "Satin Slip",
     category: "full",
-    styles: ["streetwear", "casual", "edgy"],
-    emoji: "🛹",
+    styles: ["sexy", "elegant", "evening"],
+    emoji: "🌙",
     prompt:
-      "an oversized graphic hoodie with utility cargo pants and chunky sneakers, streetwear look",
+      "a bias-cut satin slip nightgown with thin straps and lace hem",
   },
   {
-    id: "cozy-knit-look",
-    name: "Cozy Knit Look",
+    id: "fishnet-bodysuit",
+    name: "Fishnet Bodysuit",
     category: "full",
-    styles: ["cozy", "casual", "winter"],
-    emoji: "🧶",
+    styles: ["sexy", "edgy", "party"],
+    emoji: "🕸️",
     prompt:
-      "a chunky knit sweater with wool trousers and leather boots, cozy autumn look",
+      "a black fishnet bodysuit with high-cut leg openings",
   },
+
+  // ── Tops: bikini tops, bras & lingerie tops ───────────────────
   {
-    id: "summer-linen-set",
-    name: "Summer Linen Set",
-    category: "full",
-    styles: ["summer", "casual", "minimal"],
-    emoji: "🏖️",
+    id: "triangle-bikini-top",
+    name: "Triangle Bikini Top",
+    category: "top",
+    styles: ["beach", "summer", "sexy"],
+    emoji: "🌺",
     prompt:
-      "a relaxed cream linen shirt with tailored shorts, breezy summer outfit",
+      "a triangle bikini top in tropical print with tie-up straps",
   },
   {
-    id: "athleisure-set",
-    name: "Athleisure Set",
-    category: "full",
-    styles: ["sporty", "casual"],
-    emoji: "🧘",
+    id: "lace-bralette",
+    name: "Lace Bralette",
+    category: "top",
+    styles: ["sexy", "date night", "summer"],
+    emoji: "🩰",
     prompt:
-      "a fitted athleisure set with a zip-up jacket and leggings, sporty street look",
+      "a sheer lace bralette with soft no-wire support",
   },
   {
-    id: "boho-maxi-dress",
-    name: "Boho Maxi Dress",
-    category: "full",
-    styles: ["boho", "summer", "elegant"],
+    id: "push-up-bra",
+    name: "Push-Up Bra",
+    category: "top",
+    styles: ["sexy", "date night"],
+    emoji: "💋",
+    prompt:
+      "a black push-up bra with padded cups and lace detailing",
+  },
+  {
+    id: "halter-bikini-top",
+    name: "Halter Bikini Top",
+    category: "top",
+    styles: ["beach", "summer", "sexy"],
+    emoji: "🌊",
+    prompt:
+      "a halter-neck bikini top with adjustable neck tie",
+  },
+  {
+    id: "bandeau-bikini-top",
+    name: "Bandeau Bikini Top",
+    category: "top",
+    styles: ["beach", "summer"],
+    emoji: "☀️",
+    prompt:
+      "a strapless bandeau bikini top with soft cups",
+  },
+  {
+    id: "satin-camisole",
+    name: "Satin Camisole",
+    category: "top",
+    styles: ["elegant", "sexy", "evening"],
     emoji: "🌸",
     prompt:
-      "a flowing floral maxi dress with layered necklaces, bohemian look",
+      "a champagne satin camisole with lace trim",
   },
   {
-    id: "leather-moto-look",
-    name: "Leather Moto Look",
-    category: "full",
-    styles: ["edgy", "streetwear", "evening"],
-    emoji: "🏍️",
+    id: "mesh-crop-top",
+    name: "Mesh Crop Top",
+    category: "top",
+    styles: ["sexy", "edgy", "party"],
+    emoji: "🪞",
     prompt:
-      "a black leather moto jacket over a fitted tee with slim black jeans and boots",
+      "a sheer black mesh crop top with long sleeves",
   },
 
-  // ── Tops ──────────────────────────────────────────────────────
+  // ── Bottoms: bikini bottoms & panties ─────────────────────────
   {
-    id: "oversized-tee",
-    name: "Oversized Tee",
-    category: "top",
-    styles: ["casual", "streetwear", "summer"],
-    emoji: "👕",
+    id: "string-bikini-bottom",
+    name: "String Bikini Bottom",
+    category: "bottom",
+    styles: ["beach", "summer", "sexy"],
+    emoji: "🏖️",
     prompt:
-      "a clean oversized white t-shirt, relaxed and effortlessly stylish",
+      "a string bikini bottom with side ties",
   },
   {
-    id: "cable-knit-sweater",
-    name: "Cable Knit Sweater",
-    category: "top",
-    styles: ["cozy", "casual", "winter"],
-    emoji: "🧶",
-    prompt: "a cozy cream cable-knit sweater",
-  },
-  {
-    id: "denim-jacket",
-    name: "Denim Jacket",
-    category: "top",
-    styles: ["casual", "streetwear"],
-    emoji: "🦺",
-    prompt: "a classic medium-wash denim jacket",
-  },
-  {
-    id: "silk-blouse",
-    name: "Silk Blouse",
-    category: "top",
-    styles: ["elegant", "formal", "office"],
-    emoji: "👚",
-    prompt: "a flowing ivory silk blouse with a soft drape",
-  },
-  {
-    id: "cropped-puffer",
-    name: "Cropped Puffer",
-    category: "top",
-    styles: ["streetwear", "winter", "edgy"],
-    emoji: "🧥",
-    prompt: "a shiny cropped puffer jacket, trendy winter layer",
-  },
-  {
-    id: "turtleneck",
-    name: "Turtleneck",
-    category: "top",
-    styles: ["minimal", "elegant", "winter"],
-    emoji: "🥋",
-    prompt: "a fitted black turtleneck, minimal and chic",
-  },
-  {
-    id: "graphic-hoodie",
-    name: "Graphic Hoodie",
-    category: "top",
-    styles: ["casual", "streetwear", "sporty"],
-    emoji: "🧸",
-    prompt: "an oversized graphic hoodie in a muted tone",
-  },
-  {
-    id: "striped-breton",
-    name: "Striped Breton Top",
-    category: "top",
-    styles: ["minimal", "summer", "casual"],
-    emoji: "⚓",
-    prompt: "a classic navy and white striped breton top",
-  },
-
-  // ── Bottoms ───────────────────────────────────────────────────
-  {
-    id: "wide-leg-trousers",
-    name: "Wide-Leg Trousers",
+    id: "high-waist-bikini-bottom",
+    name: "High-Waist Bikini Bottom",
     category: "bottom",
-    styles: ["formal", "minimal", "office"],
-    emoji: "👖",
-    prompt: "flowing high-waisted wide-leg trousers",
+    styles: ["beach", "summer"],
+    emoji: "🍑",
+    prompt:
+      "a high-waisted retro bikini bottom",
   },
   {
-    id: "pleated-midi-skirt",
-    name: "Pleated Midi Skirt",
+    id: "lace-thong",
+    name: "Lace Thong",
     category: "bottom",
-    styles: ["elegant", "minimal", "office"],
-    emoji: "🥻",
-    prompt: "a pleated satin midi skirt",
-  },
-  {
-    id: "cargo-pants",
-    name: "Cargo Pants",
-    category: "bottom",
-    styles: ["streetwear", "casual", "edgy"],
-    emoji: "🪖",
-    prompt: "loose-fit utility cargo pants",
-  },
-  {
-    id: "high-rise-jeans",
-    name: "High-Rise Jeans",
-    category: "bottom",
-    styles: ["casual", "minimal"],
-    emoji: "🩵",
-    prompt: "high-rise straight-leg blue jeans",
-  },
-  {
-    id: "leather-pants",
-    name: "Leather Pants",
-    category: "bottom",
-    styles: ["edgy", "evening", "streetwear"],
+    styles: ["sexy", "date night"],
     emoji: "🖤",
-    prompt: "sleek black leather trousers",
+    prompt:
+      "a black lace thong with scalloped edges",
   },
   {
-    id: "mini-skirt",
-    name: "Mini Skirt",
+    id: "cheeky-panties",
+    name: "Cheeky Panties",
     category: "bottom",
-    styles: ["trendy", "summer", "edgy"],
-    emoji: "🎀",
-    prompt: "a chic tailored mini skirt",
+    styles: ["sexy", "date night"],
+    emoji: "🌶️",
+    prompt:
+      "cheeky-cut panties with a lace waistband",
   },
   {
-    id: "tailored-shorts",
-    name: "Tailored Shorts",
+    id: "high-cut-panties",
+    name: "High-Cut Panties",
     category: "bottom",
-    styles: ["summer", "casual", "formal"],
-    emoji: "🩳",
-    prompt: "crisp tailored high-waisted shorts",
+    styles: ["sexy", "vintage", "date night"],
+    emoji: "🦩",
+    prompt:
+      "high-cut vintage-style panties with side straps",
+  },
+  {
+    id: "side-tie-bikini-bottom",
+    name: "Side-Tie Bikini Bottom",
+    category: "bottom",
+    styles: ["beach", "summer", "sexy"],
+    emoji: "🫧",
+    prompt:
+      "a side-tie bikini bottom with adjustable knots",
+  },
+  {
+    id: "lace-boyshorts",
+    name: "Lace Boyshorts",
+    category: "bottom",
+    styles: ["sexy", "cozy", "date night"],
+    emoji: "🦋",
+    prompt:
+      "black lace boyshorts with a satin bow",
   },
 ];
 
@@ -227,11 +236,11 @@ export function buildWardrobePrompt(
       : item.category === "bottom" && detection?.top
         ? `, keeping the current top (${detection.top})`
         : "";
-  const core = `the person in the photo wearing ${item.prompt}`;
+  const core = `the woman in the photo wearing ${item.prompt}`;
   return `${core}${keepOther}. Preserve the person's face, pose and background.`;
 }
 
 /** Prompt used for custom (user-uploaded) attire items. */
 export function buildCustomPrompt(name: string): string {
-  return `The person in the photo is wearing: ${name}. Match its style, color and fit. Preserve the person's face, pose and background.`;
+  return `The woman in the photo is wearing: ${name}. Match its style, color and fit. Preserve the person's face, pose and background.`;
 }

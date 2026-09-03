@@ -113,9 +113,9 @@ export const generateWardrobeAsset = action({
         ecosystem: "sdxl",
         operation: "createImage",
         model,
-        prompt: `professional e-commerce product photo of a single ${args.name}: ${args.prompt}, flat lay on a plain light gray studio background, centered, soft shadows, high detail`,
+        prompt: `professional e-commerce product photo of a single women's ${args.name}: ${args.prompt}, laid flat on a clean light gray studio background, centered, soft even lighting, sharp focus, high detail, realistic fabric texture`,
         negativePrompt:
-          "worst quality, low quality, blurry, text, watermark, multiple items, people, hands",
+          "worst quality, low quality, blurry, text, watermark, multiple items, people, hands, mannequin, model, duplicate, distorted",
         width: 768,
         height: 768,
         cfgScale: 5,

@@ -701,7 +701,7 @@ export default function Editor() {
           <div className="flex w-full gap-1 rounded-full bg-muted p-1">
             {(
               [
-                ["full", "Trending"],
+                ["full", "Sets"],
                 ["top", "Tops"],
                 ["bottom", "Bottoms"],
                 ["custom", "Custom"],
