@@ -9,6 +9,8 @@ export interface OutfitDetection {
   bottom: string;
   style: string;
   colors: string[];
+  /** Present when detection failed — surfaced in the UI for debugging. */
+  error?: string;
 }
 
 const SYSTEM_PROMPT = `You are a fashion analyst. Look at the person in the photo and describe their outfit.
@@ -19,54 +21,67 @@ If a part is not visible (e.g. a crop or dress covers the bottom), use an empty 
 export const detectOutfit = action({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args): Promise<OutfitDetection | null> => {
+    const failed = (error: string): OutfitDetection => ({
+      top: "",
+      bottom: "",
+      style: "",
+      colors: [],
+      error,
+    });
+
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) return null; // vision key not configured — skip detection
+    if (!apiKey) {
+      return failed("OPENAI_API_KEY not configured");
+    }
 
     const project = await ctx.runQuery(api.projects.get, {
       projectId: args.projectId,
     });
     if (!project?.originalImageUrl) return null;
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        response_format: { type: "json_object" },
-        max_tokens: 300,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Describe this person's outfit." },
+    try {
+      const response = await fetch(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            response_format: { type: "json_object" },
+            max_tokens: 300,
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
               {
-                type: "image_url",
-                image_url: { url: project.originalImageUrl },
+                role: "user",
+                content: [
+                  { type: "text", text: "Describe this person's outfit." },
+                  {
+                    type: "image_url",
+                    image_url: { url: project.originalImageUrl },
+                  },
+                ],
               },
             ],
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Vision API error: ${response.status} - ${errorText.slice(0, 300)}`,
+          }),
+        },
       );
-    }
 
-    const data = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) return null;
+      if (!response.ok) {
+        const errorText = await response.text();
+        return failed(
+          `Vision API ${response.status}: ${errorText.slice(0, 300)}`,
+        );
+      }
 
-    try {
+      const data = (await response.json()) as {
+        choices?: { message?: { content?: string } }[];
+      };
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) return failed("Vision API returned an empty response");
+
       const parsed = JSON.parse(content) as Record<string, unknown>;
       return {
         top: String(parsed.top ?? ""),
@@ -76,8 +91,10 @@ export const detectOutfit = action({
           ? parsed.colors.map((c) => String(c))
           : [],
       };
-    } catch {
-      return null;
+    } catch (error) {
+      return failed(
+        error instanceof Error ? error.message : "Vision request failed",
+      );
     }
   },
 });

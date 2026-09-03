@@ -522,14 +522,22 @@ export default function Editor() {
                 Detecting outfit…
               </Chip>
             ) : detection ? (
-              <>
-                {detection.top && <Chip>Top: {detection.top}</Chip>}
-                {detection.bottom && <Chip>Bottom: {detection.bottom}</Chip>}
-                {detection.style && <Chip>Style: {detection.style}</Chip>}
-                {detection.colors.length > 0 && (
-                  <Chip>Colors: {detection.colors.join(", ")}</Chip>
-                )}
-              </>
+              detection.error ? (
+                <Chip>
+                  <span className="max-w-[70vw] truncate">
+                    Detection failed: {detection.error}
+                  </span>
+                </Chip>
+              ) : (
+                <>
+                  {detection.top && <Chip>Top: {detection.top}</Chip>}
+                  {detection.bottom && <Chip>Bottom: {detection.bottom}</Chip>}
+                  {detection.style && <Chip>Style: {detection.style}</Chip>}
+                  {detection.colors.length > 0 && (
+                    <Chip>Colors: {detection.colors.join(", ")}</Chip>
+                  )}
+                </>
+              )
             ) : (
               <Chip>No outfit detected</Chip>
             )}
