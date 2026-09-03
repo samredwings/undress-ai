@@ -9,14 +9,19 @@ export interface OutfitDetection {
   bottom: string;
   style: string;
   colors: string[];
+  /** Physical traits — used to keep the subject identical during try-on. */
+  skinTone: string;
+  hair: string;
+  bodyType: string;
+  bust: string;
   /** Present when detection failed — surfaced in the UI for debugging. */
   error?: string;
 }
 
-const SYSTEM_PROMPT = `You are a fashion analyst. Look at the person in the photo and describe their outfit.
+const SYSTEM_PROMPT = `You are a fashion analyst. Look at the person in the photo and describe their outfit AND their physical traits.
 Return STRICT JSON with exactly these keys and nothing else (no markdown, no commentary):
-{"top": "the top garment, e.g. white crew-neck t-shirt", "bottom": "the bottom garment, e.g. blue slim jeans", "style": "one or two style keywords, e.g. casual streetwear", "colors": ["dominant color names, 2-4 items"]}
-If a part is not visible (e.g. a crop or dress covers the bottom), use an empty string for that field.`;
+{"top": "the top garment, e.g. white crew-neck t-shirt", "bottom": "the bottom garment, e.g. blue slim jeans", "style": "one or two style keywords, e.g. casual streetwear", "colors": ["dominant color names, 2-4 items"], "skinTone": "skin tone in 1-2 words, e.g. fair, light, medium, tan, deep", "hair": "hair color and rough style, e.g. long brown hair", "bodyType": "body frame in 1-2 words, e.g. slim, athletic, curvy, plus-size", "bust": "relative bust size in 1 word, e.g. small, average, full"}
+Describe physical traits neutrally and technically for garment fitting. If a part is not visible (e.g. a crop or dress covers the bottom), use an empty string for that field.`;
 
 export const detectOutfit = action({
   args: { projectId: v.id("projects") },
@@ -26,6 +31,10 @@ export const detectOutfit = action({
       bottom: "",
       style: "",
       colors: [],
+      skinTone: "",
+      hair: "",
+      bodyType: "",
+      bust: "",
       error,
     });
 
@@ -90,6 +99,10 @@ export const detectOutfit = action({
         colors: Array.isArray(parsed.colors)
           ? parsed.colors.map((c) => String(c))
           : [],
+        skinTone: String(parsed.skinTone ?? ""),
+        hair: String(parsed.hair ?? ""),
+        bodyType: String(parsed.bodyType ?? ""),
+        bust: String(parsed.bust ?? ""),
       };
     } catch (error) {
       return failed(

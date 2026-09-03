@@ -126,13 +126,15 @@ export async function civitaiCreateVariant(
       model,
       prompt: `masterpiece, best quality, realistic photo, ${prompt}`,
       negativePrompt:
-        "worst quality, low quality, blurry, deformed, extra limbs, distorted",
+        "worst quality, low quality, blurry, deformed, disfigured, bad anatomy, mutation, extra limbs, extra fingers, duplicated face, distorted, plastic skin",
       width: 1024,
       height: 1024,
       cfgScale: 7,
       steps: 25,
       image: personImageUrl,
-      strength: 0.75,
+      // Lower strength keeps the subject's body proportions, bust size and
+      // skin tone from the source photo; the prompt steers the garment.
+      strength: 0.6,
     },
     token,
   );

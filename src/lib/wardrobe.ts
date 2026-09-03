@@ -276,25 +276,59 @@ export const WARDROBE: WardrobeItem[] = [
   },
 ];
 
+export interface WardrobeDetection {
+  top?: string;
+  bottom?: string;
+  style?: string;
+  skinTone?: string;
+  hair?: string;
+  bodyType?: string;
+  bust?: string;
+}
+
+/** Builds a "keep her physical traits" clause from the detected traits. */
+function keepPhysicalClause(
+  detection?: WardrobeDetection | null,
+): string {
+  const parts: string[] = [];
+  if (detection?.skinTone) parts.push(`${detection.skinTone} skin tone`);
+  if (detection?.hair) parts.push(`${detection.hair} hair`);
+  if (detection?.bodyType) parts.push(`${detection.bodyType} body`);
+  if (detection?.bust) parts.push(`${detection.bust} bust`);
+  return parts.length > 0
+    ? ` Keep her exact ${parts.join(", ")} unchanged.`
+    : "";
+}
+
+const PRESERVE_SUFFIX =
+  " Preserve her face, pose, lighting and background exactly. " +
+  "The garment must fit her body naturally, as if tailored to her: keep her " +
+  "body proportions, bust size and skin tone identical, with realistic " +
+  "fabric texture and soft, seamless blending.";
+
 /**
  * Builds the generation prompt for a wardrobe item, aware of the outfit
- * detected in the photo (keeps the other half of the outfit intact).
+ * detected in the photo (keeps the other half of the outfit intact and locks
+ * the subject's physical traits so she stays the same woman).
  */
 export function buildWardrobePrompt(
   item: WardrobeItem,
-  detection?: { top?: string; bottom?: string; style?: string } | null,
+  detection?: WardrobeDetection | null,
 ): string {
   const keepOther =
     item.category === "top" && detection?.bottom
-      ? `, keeping the current bottom (${detection.bottom})`
+      ? `, keeping her current bottom (${detection.bottom})`
       : item.category === "bottom" && detection?.top
-        ? `, keeping the current top (${detection.top})`
+        ? `, keeping her current top (${detection.top})`
         : "";
   const core = `the woman in the photo wearing ${item.prompt}`;
-  return `${core}${keepOther}. Preserve the person's face, pose and background.`;
+  return `${core}${keepOther}.${keepPhysicalClause(detection)}${PRESERVE_SUFFIX}`;
 }
 
 /** Prompt used for custom (user-uploaded) attire items. */
-export function buildCustomPrompt(name: string): string {
-  return `The woman in the photo is wearing: ${name}. Match its style, color and fit. Preserve the person's face, pose and background.`;
+export function buildCustomPrompt(
+  name: string,
+  detection?: WardrobeDetection | null,
+): string {
+  return `The woman in the photo is wearing: ${name}. Match its style, color and fit precisely.${keepPhysicalClause(detection)}${PRESERVE_SUFFIX}`;
 }

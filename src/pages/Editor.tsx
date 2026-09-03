@@ -282,7 +282,7 @@ export default function Editor() {
       setGenError(null);
       setGeneratingId(`custom:${item._id}`);
       try {
-        const promptText = buildCustomPrompt(item.name);
+        const promptText = buildCustomPrompt(item.name, detection);
         const generationId = await createGeneration({
           projectId,
           prompt: promptText,
@@ -303,7 +303,7 @@ export default function Editor() {
         setGeneratingId(null);
       }
     },
-    [projectId, createGeneration, tryOnCustom],
+    [projectId, createGeneration, tryOnCustom, detection],
   );
 
   // ── Chat ─────────────────────────────────────────────────────
@@ -536,6 +536,10 @@ export default function Editor() {
                   {detection.colors.length > 0 && (
                     <Chip>Colors: {detection.colors.join(", ")}</Chip>
                   )}
+                  {detection.skinTone && <Chip>Skin: {detection.skinTone}</Chip>}
+                  {detection.hair && <Chip>Hair: {detection.hair}</Chip>}
+                  {detection.bodyType && <Chip>Body: {detection.bodyType}</Chip>}
+                  {detection.bust && <Chip>Bust: {detection.bust}</Chip>}
                 </>
               )
             ) : (
