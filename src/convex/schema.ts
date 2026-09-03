@@ -71,6 +71,12 @@ const schema = defineSchema(
       imageStorageId: v.id("_storage"),
       createdAt: v.number(),
     }).index("by_user", ["userId"]),
+
+    // Generated thumbnail images for the pre-built wardrobe catalog
+    wardrobe_assets: defineTable({
+      itemId: v.string(),
+      imageStorageId: v.id("_storage"),
+    }).index("by_item", ["itemId"]),
   },
   {
     schemaValidation: false,

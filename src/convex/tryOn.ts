@@ -23,34 +23,13 @@ interface CivitaiWorkflow {
   }[];
 }
 
-async function runCivitaiTryOn(
-  personImageUrl: string,
-  prompt: string,
+/** Submit an imageGen workflow to Civitai and wait for the first result image. */
+async function submitCivitaiImageJob(
+  input: Record<string, unknown>,
   token: string,
 ): Promise<string> {
-  const model = process.env.CIVITAI_TRYON_MODEL ?? DEFAULT_MODEL;
-
   const body = {
-    steps: [
-      {
-        $type: "imageGen",
-        input: {
-          engine: "sdcpp",
-          ecosystem: "sdxl",
-          operation: "createVariant",
-          model,
-          prompt: `masterpiece, best quality, realistic photo, ${prompt}`,
-          negativePrompt:
-            "worst quality, low quality, blurry, deformed, extra limbs, distorted",
-          width: 1024,
-          height: 1024,
-          cfgScale: 7,
-          steps: 25,
-          image: personImageUrl,
-          strength: 0.75,
-        },
-      },
-    ],
+    steps: [{ $type: "imageGen", input }],
   };
 
   const submit = await fetch(`${CIVITAI_ORCH_URL}/workflows?wait=60`, {
@@ -90,6 +69,32 @@ async function runCivitaiTryOn(
   const url = step.output?.images?.[0]?.url;
   if (!url) throw new Error("Civitai returned no image");
   return url;
+}
+
+async function runCivitaiTryOn(
+  personImageUrl: string,
+  prompt: string,
+  token: string,
+): Promise<string> {
+  const model = process.env.CIVITAI_TRYON_MODEL ?? DEFAULT_MODEL;
+  return submitCivitaiImageJob(
+    {
+      engine: "sdcpp",
+      ecosystem: "sdxl",
+      operation: "createVariant",
+      model,
+      prompt: `masterpiece, best quality, realistic photo, ${prompt}`,
+      negativePrompt:
+        "worst quality, low quality, blurry, deformed, extra limbs, distorted",
+      width: 1024,
+      height: 1024,
+      cfgScale: 7,
+      steps: 25,
+      image: personImageUrl,
+      strength: 0.75,
+    },
+    token,
+  );
 }
 
 /**
@@ -164,5 +169,63 @@ export const tryOnCustom = action({
       });
       throw error;
     }
+  },
+});
+
+/**
+ * Generates (once) a flat-lay product photo for a pre-built wardrobe item and
+ * stores it in Convex storage, keyed by the catalog item id.
+ */
+export const generateWardrobeAsset = action({
+  args: {
+    itemId: v.string(),
+    name: v.string(),
+    prompt: v.string(),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ imageUrl: string | null }> => {
+    const token = process.env.CIVITAI_API_KEY;
+    if (!token) throw new Error("CIVITAI_API_KEY not configured");
+
+    const existing = await ctx.runQuery(api.wardrobe.getWardrobeAsset, {
+      itemId: args.itemId,
+    });
+    if (existing?.imageUrl) return { imageUrl: existing.imageUrl };
+
+    const model = process.env.CIVITAI_TRYON_MODEL ?? DEFAULT_MODEL;
+    const url = await submitCivitaiImageJob(
+      {
+        engine: "sdcpp",
+        ecosystem: "sdxl",
+        operation: "createImage",
+        model,
+        prompt: `professional e-commerce product photo of a single ${args.name}: ${args.prompt}, flat lay on a plain light gray studio background, centered, soft shadows, high detail`,
+        negativePrompt:
+          "worst quality, low quality, blurry, text, watermark, multiple items, people, hands",
+        width: 768,
+        height: 768,
+        cfgScale: 5,
+        steps: 12,
+      },
+      token,
+    );
+
+    const download = await fetch(url);
+    if (!download.ok)
+      throw new Error(`Failed to download thumbnail (${download.status})`);
+    const buffer = await download.arrayBuffer();
+    const contentType = download.headers.get("content-type") || "image/jpeg";
+    const imageStorageId = await ctx.storage.store(
+      new Blob([buffer], { type: contentType }),
+    );
+
+    await ctx.runMutation(api.wardrobe.setWardrobeAsset, {
+      itemId: args.itemId,
+      imageStorageId,
+    });
+    const imageUrl = await ctx.storage.getUrl(imageStorageId);
+    return { imageUrl };
   },
 });

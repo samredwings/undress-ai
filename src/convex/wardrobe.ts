@@ -48,6 +48,58 @@ export const addCustom = mutation({
   },
 });
 
+export const listWardrobeAssets = query({
+  args: {},
+  handler: async (ctx) => {
+    const assets = await ctx.db.query("wardrobe_assets").collect();
+    return Promise.all(
+      assets.map(async (asset) => ({
+        ...asset,
+        imageUrl:
+          (await ctx.storage.getUrl(asset.imageStorageId)) ?? null,
+      })),
+    );
+  },
+});
+
+export const getWardrobeAsset = query({
+  args: { itemId: v.string() },
+  handler: async (ctx, args) => {
+    const asset = await ctx.db
+      .query("wardrobe_assets")
+      .withIndex("by_item", (q) => q.eq("itemId", args.itemId))
+      .first();
+    if (!asset) return null;
+    return {
+      ...asset,
+      imageUrl: (await ctx.storage.getUrl(asset.imageStorageId)) ?? null,
+    };
+  },
+});
+
+export const setWardrobeAsset = mutation({
+  args: {
+    itemId: v.string(),
+    imageStorageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("wardrobe_assets")
+      .withIndex("by_item", (q) => q.eq("itemId", args.itemId))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        imageStorageId: args.imageStorageId,
+      });
+    } else {
+      await ctx.db.insert("wardrobe_assets", {
+        itemId: args.itemId,
+        imageStorageId: args.imageStorageId,
+      });
+    }
+  },
+});
+
 export const removeCustom = mutation({
   args: { itemId: v.id("wardrobe_items") },
   handler: async (ctx, args) => {

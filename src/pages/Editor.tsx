@@ -107,11 +107,13 @@ export default function Editor() {
     projectId ? { projectId } : "skip",
   );
   const customItems = useQuery(api.wardrobe.listCustom);
+  const wardrobeAssets = useQuery(api.wardrobe.listWardrobeAssets);
 
   const generateUploadUrl = useMutation(api.projects.generateUploadUrl);
   const createGeneration = useMutation(api.generations.create);
   const generateOutfit = useAction(api.generate.generateOutfit);
   const tryOnCustom = useAction(api.tryOn.tryOnCustom);
+  const generateWardrobeAsset = useAction(api.tryOn.generateWardrobeAsset);
   const detectOutfit = useAction(api.detect.detectOutfit);
   const addCustom = useMutation(api.wardrobe.addCustom);
   const removeCustom = useMutation(api.wardrobe.removeCustom);
@@ -176,6 +178,55 @@ export default function Editor() {
     if (tab === "custom") return [];
     return WARDROBE.filter((item) => item.category === tab);
   }, [tab]);
+
+  // Map of catalog item id → generated thumbnail URL
+  const assetsByItem = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const asset of wardrobeAssets ?? []) {
+      if (asset.imageUrl) map.set(asset.itemId, asset.imageUrl);
+    }
+    return map;
+  }, [wardrobeAssets]);
+
+  const pendingThumbs = useMemo(
+    () => WARDROBE.filter((item) => !assetsByItem.has(item.id)).length,
+    [assetsByItem],
+  );
+
+  const [thumbBusy, setThumbBusy] = useState(false);
+  const [thumbProgress, setThumbProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+
+  const handleGenerateThumbs = useCallback(async () => {
+    const pending = WARDROBE.filter((item) => !assetsByItem.has(item.id));
+    if (pending.length === 0 || thumbBusy) return;
+    setThumbBusy(true);
+    setGenError(null);
+    setThumbProgress({ done: 0, total: pending.length });
+    let done = 0;
+    for (const item of pending) {
+      try {
+        await generateWardrobeAsset({
+          itemId: item.id,
+          name: item.name,
+          prompt: item.prompt,
+        });
+      } catch (err) {
+        setGenError(
+          err instanceof Error
+            ? err.message
+            : "Wardrobe photo generation failed",
+        );
+        break;
+      }
+      done += 1;
+      setThumbProgress({ done, total: pending.length });
+    }
+    setThumbBusy(false);
+    setThumbProgress(null);
+  }, [assetsByItem, thumbBusy, generateWardrobeAsset]);
 
   // ── Generation ────────────────────────────────────────────────
   const runGeneration = useCallback(
@@ -585,9 +636,15 @@ export default function Editor() {
                   disabled={generatingId !== null}
                   className="group w-20 shrink-0 cursor-pointer text-left disabled:cursor-default"
                 >
-                  <div className="flex aspect-[3/4] items-center justify-center rounded-xl border border-border/50 bg-muted text-2xl transition-colors group-hover:border-border group-active:bg-muted/60">
+                  <div className="flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl border border-border/50 bg-muted text-2xl transition-colors group-hover:border-border group-active:bg-muted/60">
                     {generatingId === item.id ? (
                       <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                    ) : assetsByItem.get(item.id) ? (
+                      <img
+                        src={assetsByItem.get(item.id)}
+                        alt={item.name}
+                        className="size-full object-cover"
+                      />
                     ) : (
                       item.emoji
                     )}
@@ -598,6 +655,36 @@ export default function Editor() {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Generate wardrobe photos (once) */}
+        {pendingThumbs > 0 && (
+          <div className="shrink-0 px-4 pt-3">
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full cursor-pointer gap-2 text-xs"
+              onClick={handleGenerateThumbs}
+              disabled={thumbBusy}
+            >
+              {thumbBusy ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Generating {thumbProgress?.done ?? 0}/
+                  {thumbProgress?.total ?? pendingThumbs} photos…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="size-3.5" />
+                  Generate wardrobe photos ({pendingThumbs} remaining)
+                </>
+              )}
+            </Button>
+            <p className="mt-1.5 text-center text-[10px] text-muted-foreground/60">
+              One-time flat-lay photos, ~3–5 Buzz each (free daily claims cover
+              it)
+            </p>
           </div>
         )}
 
@@ -705,9 +792,15 @@ export default function Editor() {
                   disabled={generatingId !== null}
                   className="group cursor-pointer text-left disabled:cursor-default"
                 >
-                  <div className="flex aspect-[3/4] items-center justify-center rounded-xl border border-border/50 bg-muted text-3xl transition-all group-hover:border-border group-hover:bg-muted/60 group-active:scale-[0.98]">
+                  <div className="flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl border border-border/50 bg-muted text-3xl transition-all group-hover:border-border group-hover:bg-muted/60 group-active:scale-[0.98]">
                     {generatingId === item.id ? (
                       <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                    ) : assetsByItem.get(item.id) ? (
+                      <img
+                        src={assetsByItem.get(item.id)}
+                        alt={item.name}
+                        className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                      />
                     ) : (
                       item.emoji
                     )}
