@@ -233,5 +233,5 @@ export function buildWardrobePrompt(
 
 /** Prompt used for custom (user-uploaded) attire items. */
 export function buildCustomPrompt(name: string): string {
-  return `The person in the photo is wearing the exact garment from the reference image: ${name}. Match its style, color and fit. Preserve the person's face, pose and background.`;
+  return `The person in the photo is wearing: ${name}. Match its style, color and fit. Preserve the person's face, pose and background.`;
 }

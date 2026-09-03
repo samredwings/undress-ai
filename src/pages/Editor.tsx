@@ -111,6 +111,7 @@ export default function Editor() {
   const generateUploadUrl = useMutation(api.projects.generateUploadUrl);
   const createGeneration = useMutation(api.generations.create);
   const generateOutfit = useAction(api.generate.generateOutfit);
+  const tryOnCustom = useAction(api.tryOn.tryOnCustom);
   const detectOutfit = useAction(api.detect.detectOutfit);
   const addCustom = useMutation(api.wardrobe.addCustom);
   const removeCustom = useMutation(api.wardrobe.removeCustom);
@@ -226,19 +227,32 @@ export default function Editor() {
 
   const tryCustom = useCallback(
     async (item: CustomItem) => {
+      if (!projectId) return;
+      setGenError(null);
+      setGeneratingId(`custom:${item._id}`);
       try {
-        await runGeneration({
-          promptText: buildCustomPrompt(item.name),
+        const promptText = buildCustomPrompt(item.name);
+        const generationId = await createGeneration({
+          projectId,
+          prompt: promptText,
           garmentImageStorageId: item.imageStorageId,
-          marker: `custom:${item._id}`,
         });
+        const result = await tryOnCustom({
+          generationId,
+          projectId,
+          prompt: promptText,
+          garmentImageStorageId: item.imageStorageId,
+        });
+        if (result.imageUrl) setActiveResult(result.imageUrl);
       } catch (error) {
         setGenError(
-          error instanceof Error ? error.message : "Generation failed",
+          error instanceof Error ? error.message : "Try-on failed",
         );
+      } finally {
+        setGeneratingId(null);
       }
     },
-    [runGeneration],
+    [projectId, createGeneration, tryOnCustom],
   );
 
   // ── Chat ─────────────────────────────────────────────────────

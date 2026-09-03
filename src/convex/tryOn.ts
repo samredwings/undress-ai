@@ -1,0 +1,168 @@
+"use node";
+
+import { v } from "convex/values";
+import { action } from "./_generated/server";
+import { api } from "./_generated/api";
+
+const CIVITAI_ORCH_URL = "https://orchestration.civitai.com/v2/consumer";
+
+// Default SDXL checkpoint (from Civitai's official docs example).
+// Override with the CIVITAI_TRYON_MODEL env var (AIR URN), e.g. to point at
+// a virtual-try-on tuned checkpoint or add a try-on LoRA.
+const DEFAULT_MODEL = "urn:air:sdxl:checkpoint:civitai:101055@128078";
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+interface CivitaiWorkflow {
+  id?: string;
+  status?: string;
+  steps?: {
+    status?: string;
+    reason?: string;
+    output?: { images?: { url?: string }[] };
+  }[];
+}
+
+async function runCivitaiTryOn(
+  personImageUrl: string,
+  prompt: string,
+  token: string,
+): Promise<string> {
+  const model = process.env.CIVITAI_TRYON_MODEL ?? DEFAULT_MODEL;
+
+  const body = {
+    steps: [
+      {
+        $type: "imageGen",
+        input: {
+          engine: "sdcpp",
+          ecosystem: "sdxl",
+          operation: "createVariant",
+          model,
+          prompt: `masterpiece, best quality, realistic photo, ${prompt}`,
+          negativePrompt:
+            "worst quality, low quality, blurry, deformed, extra limbs, distorted",
+          width: 1024,
+          height: 1024,
+          cfgScale: 7,
+          steps: 25,
+          image: personImageUrl,
+          strength: 0.75,
+        },
+      },
+    ],
+  };
+
+  const submit = await fetch(`${CIVITAI_ORCH_URL}/workflows?wait=60`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!submit.ok) {
+    const errorText = (await submit.text()).slice(0, 400);
+    throw new Error(`Civitai submit error ${submit.status}: ${errorText}`);
+  }
+  let workflow = (await submit.json()) as CivitaiWorkflow;
+
+  // If the synchronous wait window expired, poll the workflow by id
+  if (!workflow.steps && workflow.id) {
+    for (let i = 0; i < 10; i++) {
+      await sleep(3000);
+      const poll = await fetch(
+        `${CIVITAI_ORCH_URL}/workflows/${workflow.id}?wait=30`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!poll.ok) continue;
+      workflow = (await poll.json()) as CivitaiWorkflow;
+      if (workflow.steps) break;
+    }
+  }
+
+  const step = workflow.steps?.[0];
+  if (!step || step.status === "failed" || workflow.status === "failed") {
+    throw new Error(
+      `Civitai generation failed (${step?.reason ?? "unknown reason"})`,
+    );
+  }
+  const url = step.output?.images?.[0]?.url;
+  if (!url) throw new Error("Civitai returned no image");
+  return url;
+}
+
+/**
+ * Dedicated garment try-on. Uses Civitai's SDXL img2img (person photo as the
+ * source, garment described by the prompt). If no CIVITAI_API_KEY is set,
+ * falls back to the existing Stability AI image-to-image action.
+ */
+export const tryOnCustom = action({
+  args: {
+    generationId: v.id("generations"),
+    projectId: v.id("projects"),
+    prompt: v.string(),
+    garmentImageStorageId: v.optional(v.id("_storage")),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ success: boolean; imageUrl: string | null }> => {
+    await ctx.runMutation(api.generations.updateStatus, {
+      generationId: args.generationId,
+      status: "processing",
+    });
+
+    try {
+      const token = process.env.CIVITAI_API_KEY;
+      if (!token) {
+        // Fallback to the Stability AI image-to-image path
+        return await ctx.runAction(api.generate.generateOutfit, {
+          generationId: args.generationId,
+          projectId: args.projectId,
+          prompt: args.prompt,
+        });
+      }
+
+      const project = await ctx.runQuery(api.projects.get, {
+        projectId: args.projectId,
+      });
+      if (!project) throw new Error("Project not found");
+      if (!project.originalImageUrl)
+        throw new Error("Project image is missing");
+
+      const resultImageUrl = await runCivitaiTryOn(
+        project.originalImageUrl,
+        args.prompt,
+        token,
+      );
+
+      // Download the result and store it in Convex file storage
+      const download = await fetch(resultImageUrl);
+      if (!download.ok)
+        throw new Error(`Failed to download result (${download.status})`);
+      const buffer = await download.arrayBuffer();
+      const contentType = download.headers.get("content-type") || "image/jpeg";
+      const resultImageStorageId = await ctx.storage.store(
+        new Blob([buffer], { type: contentType }),
+      );
+
+      await ctx.runMutation(api.generations.updateResult, {
+        generationId: args.generationId,
+        resultImageStorageId,
+      });
+
+      const imageUrl = await ctx.storage.getUrl(resultImageStorageId);
+      return { success: true, imageUrl };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      await ctx.runMutation(api.generations.updateStatus, {
+        generationId: args.generationId,
+        status: "failed",
+        error: errorMessage,
+      });
+      throw error;
+    }
+  },
+});
